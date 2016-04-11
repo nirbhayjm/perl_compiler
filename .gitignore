@@ -1,0 +1,6 @@
+src/*.pyc
+src/*.pl
+src/parsetab.py
+src/parser.out
+*.html
+bin/*
