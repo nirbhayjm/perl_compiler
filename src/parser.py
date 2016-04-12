@@ -22,75 +22,6 @@ class Node(object):
             else: 
                 print str(child), 
 
-def RightMostPrint(node):
-    SymbolList = [node]
-    HasNonTerminals = True
-
-    while(HasNonTerminals):
-
-        OldSymbolList = SymbolList[:]
-        RightMostIndex = None   # Index of right-most non-terminal
-
-        # Finding rightmost Non-terminal
-        for i,symbol in enumerate(SymbolList):
-            if isinstance(symbol,Node):
-                RightMostIndex = i
-        
-        if RightMostIndex is None:
-            # No more Non-terminals remaining
-            HasNonTerminals = False
-        else:
-            # Expanding right-most Non-terminal
-            i = RightMostIndex
-            if SymbolList[i].children is not None:
-                SymbolList = SymbolList[:i] + SymbolList[i].children + SymbolList[(i+1):]
-            else:
-                print "Null Children List! CRITICAL ERROR"
-                print "</li></br><li>"
-                # SymbolList = SymbolList[:i] + SymbolList[i].content + SymbolList[(i+1):]
-
-
-        # if SymbolList[RightMostIndex].content is SymbolList[i].children
-        # print "RightMostIndex:",RightMostIndex
-        # print "OldSymbolList:",OldSymbolList
-
-        #--- Printing SymbolList contents:
-        for i,symbol in enumerate(OldSymbolList):
-            if isinstance(symbol,Node):
-                if i is RightMostIndex:
-                    #print '\033[4m%s\033[0m' % symbol.content,
-                    print "<b>%s</b>"%symbol.content,
-                else:
-                    print symbol.content,
-            else:
-                print symbol,
-        if HasNonTerminals:
-            print "</li></br><li>"
-        else:
-            print "</li></br>"
-
-def nodify(p,name,debug=False):
-    # if debug is True:
-    #     contents = p[1:]
-    #     # print contents
-    #     for i,item in enumerate(contents[:]):
-    #         # print "ITEM:",item
-    #         if isinstance(item,Node):
-    #             # print "It is CONTENT"
-    #             contents[i] = item.content
-    #             # print "Changed contents:",contents[i]
-    #         # else:
-    #         #   print "Not CONTENT!"
-    #     # print "Comparison",contents[0],name 
-    #     if len(contents) is 1 and contents[0] is name:
-    #         print "Skipping:",contents[0]
-    #         print "</li></br><li>"
-    #         return
-    #     print "Attaching contents:",contents, " to parent:",name
-    #     print "</li></br><li>"
-    # # p[0] = Node(name,p[1:])
-    return
-
 #==============================================================================
 # Start symbol
 #==============================================================================
@@ -99,7 +30,6 @@ start = 'program'
 def p_program(p):
     '''program          : M_global_next stmts
     '''
-    nodify(p,'program')
     TAC[ST.currentScope].placeLabel(p[1]['labels']['Stmt_End'])
     TAC[ST.currentScope].emit('exit','0','','')
 
@@ -127,8 +57,6 @@ def p_stmts(p):
     '''stmts            : stmts M_stmt_next stmt
                         |       M_stmt_next stmt
     ''' 
-    nodify(p,'stmts')
-    p[0] = p[-1]
 
 def p_M_stmt_next(p):
     '''M_stmt_next :'''
@@ -159,7 +87,6 @@ def p_stmt(p):
                         | PACKAGE SUBROUTINE_ID     EOS
                         | exit_stmt                 EOS
     '''
-    nodify(p,'stmt')
     p[0] = p[1]
     TAC[ST.currentScope].placeLabel(p[-1]['labels']['Stmt_End'])
 
@@ -167,8 +94,6 @@ def p_compound_stmt(p):
     '''compound_stmt    : OPEN_BRACE M_CS_next stmts CLOSE_BRACE
                         | OPEN_BRACE                 CLOSE_BRACE
     '''
-    nodify(p,'compound_stmt')
-    # if len(p) == 5:
 
 def p_M_CS_next(p):
     '''M_CS_next :'''
@@ -197,7 +122,6 @@ def p_exp_stmt(p):
     '''exp_stmt         : assignment_exp
                         | arith_relat_exp
     '''
-    nodify(p,'exp_stmt')
     p[0] = p[1]
 
 def p_exit_stmt(p):
@@ -206,7 +130,6 @@ def p_exit_stmt(p):
                         | EXIT arith_relat_exp IF exp_stmt
                         | EXIT                 IF exp_stmt
     '''
-    nodify(p,'exit_stmt')
     if len(p) <= 3:
         if len(p) == 3:
             exit_val = p[2]['place']
@@ -227,7 +150,6 @@ def p_exit_stmt(p):
 def p_EOS(p):
     '''EOS              : SEMICOLON
     '''
-    nodify(p,'EOS')
 
 #==============================================================================
 # Selection statements (if, else)
@@ -241,7 +163,6 @@ def p_selection_stmt(p):
     '''selection_stmt   : IF     OPEN_PAREN exp_stmt CLOSE_PAREN M_ifBegin compound_stmt M_ifEnd else_block
                         | UNLESS OPEN_PAREN exp_stmt CLOSE_PAREN M_ifBegin compound_stmt M_ifEnd else_block
     '''
-    nodify(p,'selection_stmt')
 
 def p_M_ifBegin(p):
     ''' M_ifBegin :'''
@@ -291,7 +212,6 @@ def p_else_block(p):
     '''else_block       : elsif_list ELSE M_elseLast compound_stmt
                         | elsif_list
     '''
-    nodify(p,'else_block')
 
 def p_M_elseLast(p):
     '''M_elseLast :'''
@@ -302,7 +222,6 @@ def p_elsif_list(p):
     '''elsif_list       : M_propEnd ELSIF OPEN_PAREN exp_stmt CLOSE_PAREN M_elsifBegin compound_stmt M_elsifEnd elsif_list
                         |
     '''
-    nodify(p,'elsif_list')
 
 def p_M_propEnd(p):
     '''M_propEnd :'''
@@ -352,7 +271,6 @@ def p_post_selection(p):
                         | UNLESS OPEN_PAREN exp_stmt CLOSE_PAREN
                         |
     '''
-    nodify(p,'post_selection')
     if len(p) == 1:
         p[0] = None
     else:
@@ -379,19 +297,16 @@ def p_switch_stmt(p):
     '''
     TAC[ST.currentScope].placeLabel(p[5]['labels']['SwitchStmtEnd'])
 
-    nodify(p,'switch_stmt')
 
 def p_switch_block(p):
     '''switch_block     : M_switchStmtValue case_stmt switch_block
                         | M_switchStmtValue default_case
     '''
-    nodify(p,'switch_block')
 
 #--- replaced primary_exp with exp_stmt as it it the same as the if-else expressions
 def p_case_stmt(p):
     '''case_stmt        : CASE OPEN_PAREN exp_stmt CLOSE_PAREN M_caseBegin compound_stmt
     '''
-    nodify(p,'case_stmt')
 
     TAC[ST.currentScope].addPatchList(p[-1]['labels']['SwitchStmtEnd'])
     TAC[ST.currentScope].emit('goto',p[-1]['labels']['SwitchStmtEnd'],'','','') 
@@ -401,7 +316,6 @@ def p_default_case(p):
     '''default_case     : ELSE M_defaultCase compound_stmt
                         |
     '''
-    nodify(p,'default_case')
 
 def p_M_switchBegin(p):
     ''' M_switchBegin :'''
@@ -465,8 +379,6 @@ def p_iteration_stmt(p):
                         | FOREACH SCALAR_ID OPEN_PAREN array_indexer CLOSE_PAREN compound_stmt
                         | FOR OPEN_PAREN for_exp_stmt SEMICOLON M_E2_begin for_exp_stmt SEMICOLON M_E3_begin for_exp_stmt CLOSE_PAREN M_FCS_begin compound_stmt
     '''
-    nodify(p,'iteration_stmt')
-
     if p[1] in ['while','until']:
         TAC[ST.currentScope].emit('goto',p[-1]['labels']['Stmt_Start'],'','')
     elif p[1] == 'for':
@@ -478,7 +390,6 @@ def p_for_exp_stmt(p):
     '''for_exp_stmt     : exp_stmt
                         |
     '''
-    nodify(p,'for_exp_stmt')
     if len(p) == 2:
         p[0] = p[1]
 
@@ -576,7 +487,6 @@ def p_loop_control_stmt(p):
                             | REDO
                             | GOTO 
     '''
-    nodify(p,'loop_control_stmt')
         
     if p[-1]['labels']['last'] is 'Unassigned':
         print "Semantic Error! Can't use loop control statement outside of loops!"
@@ -600,9 +510,6 @@ def p_loop_control_stmt(p):
 def p_subroutine(p):
     '''subroutine           : SUB SUBROUTINE_ID M_SubBegin compound_stmt
     '''
-    nodify(p,'subroutine')
-
-
     TAC[ST.currentScope].emit('ret','','','')
     ST.endDeclareSub()
 
@@ -620,7 +527,6 @@ def p_subroutine_control(p):
     '''
     p[0] = p[2]
     TAC[ST.currentScope].emit('ret',p[2]['place'],'','')
-    nodify(p,'subroutine_control')
 
 #==============================================================================
 # 'print' function implementation
@@ -644,13 +550,11 @@ def p_print_stmt(p):
         p[0] = p[2]
     else:
         p[0] = p[3]
-    nodify(p,'print_stmt')
 
 def p_print_list(p):
     '''print_list       : print_list print_sep arith_relat_exp
                         | arith_relat_exp
     '''
-    nodify(p,'print_list')
     if len(p) == 2:
         p[0] = p[1]
         TAC[ST.currentScope].emit('print',p[1]['place'],'','')
@@ -662,7 +566,6 @@ def p_print_list(p):
 def p_print_sep(p):
     '''print_sep        : COMMA
     '''
-    nodify(p,'print_sep')
     p[0] = p[1]
 
 #==============================================================================
@@ -683,7 +586,6 @@ def p_decl_var(p):
                             | HASH_ID
                             | SCALAR_ID
     ''' 
-    nodify(p,'decl_list')
     p[0] = p[-2]
 
     if len(p) == 2:
@@ -707,7 +609,6 @@ def p_decl_var(p):
 def p_assignment_exp_scalar(p):
     '''assignment_exp       : scalar_indexer  assignment_op     arith_relat_exp     post_selection
     '''
-    nodify(p,"assignment_exp_scalar")
 
     if p[4] != None: #--- Post-selection
         # print p[4]
@@ -771,7 +672,6 @@ def p_assignment_exp_general(p):
                             | type_scope M_TS ARRAY_ID ASSIGN SUBROUTINE_ID SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN
                             | type_scope M_TS HASH_ID  ASSIGN SUBROUTINE_ID SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN    
     '''
-    nodify(p,'assignment_exp')
 
 def p_assignment_op(p):
     '''assignment_op        : ASSIGN
@@ -782,7 +682,6 @@ def p_assignment_op(p):
                             | MOD_ASSIGN
                             | EXPONENT_ASSIGN
     '''
-    nodify(p,'assignment_op')
     p[0] = p[1]
 
 def p_arith_relat_exp(p):
@@ -827,7 +726,6 @@ def p_arith_relat_exp(p):
 
                             | unary_exp
     '''
-    nodify(p,'arith_relat_exp')
     if p[1]['type'] == 'array':
         temp = ST.createTemp()
         TAC[ST.currentScope].emit('=',temp,p[1]['place'],'')
@@ -942,7 +840,6 @@ def p_unary_exp(p):
     '''unary_exp            : postfix_exp
                             | unary_operator postfix_exp
     '''
-    nodify(p,'unary_exp')
     if len(p) == 2:
         p[0] = p[1]
     else:
@@ -977,7 +874,6 @@ def p_unary_operator(p):
                             | SLASH
                             | SCALAR
     '''
-    nodify(p,'unary_operator')
     p[0] = p[1]
 
 def p_postfix_exp(p):
@@ -985,7 +881,6 @@ def p_postfix_exp(p):
                             | primary_exp AUTO_INC
                             | primary_exp AUTO_DEC
     '''
-    nodify(p,'postfix_exp')
     if len(p) == 2:
         p[0] = p[1]
     else:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
@@ -1008,7 +903,6 @@ def p_primary_exp_literal(p):
                             | HEX
                             | STRING
     '''
-    nodify(p,'primary_exp_literal')
 
     # lhs_place = ST.createTemp()
     p[0] = {
@@ -1025,7 +919,6 @@ def p_primary_exp_indexer(p):
                             | hash_indexer
                             | OPEN_PAREN arith_relat_exp CLOSE_PAREN
     '''
-    nodify(p,'p_primary_exp_indexer')
     if len(p) == 2:
         p[0] = p[1]
     else:
@@ -1035,7 +928,6 @@ def p_primary_exp_subroutine_call(p):
     '''primary_exp          : SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
                             | SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
     '''
-    nodify(p,'primary_exp_subroutine_call')
     lhs_place = ST.createTemp()
     p[0] = {
         'place': lhs_place,
@@ -1059,8 +951,6 @@ def p_primary_exp_misc(p):
                             | DELETE ARGUMENT_SCALAR_ID OPEN_SBRACKET   arith_relat_exp CLOSE_SBRACKET 
                             | SUBROUTINE_ID SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN
     '''
-    nodify(p,'primary_exp_general')
-
     if len(p) == 2:
         p[0] = p[1]
     # print p[0]
@@ -1079,14 +969,12 @@ def p_array_op_exp(p):
                             | UNSHIFT   OPEN_PAREN  OPEN_PAREN ARRAY_ID CLOSE_PAREN COMMA OPEN_PAREN array_decl_list CLOSE_PAREN CLOSE_PAREN
                             | SPLICE    OPEN_PAREN  ARRAY_ID COMMA primary_exp COMMA primary_exp COMMA array_decl_list CLOSE_PAREN
     '''
-    nodify(p,'array_op_exp')
 
 def p_array_decl_list(p):
     '''array_decl_list      : arith_relat_exp
                             | arith_relat_exp COMMA array_decl_list
                             |
     '''
-    nodify(p,'array_decl_list')
     if len(p) == 4:
         p[0] = {}
         p[0]['place'] = [p[1]['place']]
@@ -1107,14 +995,12 @@ def p_string_list(p):
                             | HEX           string_list
                             | 
     '''
-    nodify(p,'string_list')
 
 def p_type_scope(p):
     '''type_scope           : MY
                             | LOCAL
                             | STATE
     '''         
-    nodify(p,'type_scope')
     p[0] = p[1]
 
 def p_M_TS(p):
@@ -1128,9 +1014,7 @@ def p_scalar_indexer(p):
                             | ARGUMENT_SCALAR_ID
                             | ARGUMENT_SCALAR_ID OPEN_SBRACKET   arith_relat_exp CLOSE_SBRACKET
                             | ARGUMENT_ARRAY_ID OPEN_SBRACKET   arith_relat_exp CLOSE_SBRACKET
-    '''
-    nodify(p,'scalar_indexer')
-    
+    '''    
     if len(p) == 2:
         if not ST.lookupIdentifier(p[1][1:]):
             lhs_place = ST.createTemp()
@@ -1234,21 +1118,17 @@ def p_array_indexer(p):
                 'type' : lhs_type,
             }
 
-    nodify(p,'array_indexer')
-
 def p_hash_indexer(p):
     '''hash_indexer         : HASH_ID
                             | HASH_ID OPEN_BRACE        arith_relat_exp CLOSE_BRACE
                             | HASH_ID OPEN_BRACE        SUBROUTINE_ID   CLOSE_BRACE
     '''
-    nodify(p,'hash_indexer')
 
 def p_hash_decl(p):
     '''hash_decl            : arith_relat_exp KEY_VALUE arith_relat_exp COMMA hash_decl
                             | arith_relat_exp KEY_VALUE arith_relat_exp
                         
     '''
-    nodify(p,'hash_decl')    
 
 #--- Syntax error rule
 def p_error(p):
