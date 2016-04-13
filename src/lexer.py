@@ -35,8 +35,8 @@ operators = (
     'NOT',
     # 'INVERTED_QUOTES',
     'DOT',
-    # 'REPEAT',
-    # 'RANGE',
+    'AT',
+    'DOLLAR',
     'AUTO_INC',
     'AUTO_DEC',
     'DEREFERENCE',
@@ -87,8 +87,9 @@ t_C_AND = r'&&'
 t_C_OR = r'\|\|'
 t_NOT = r'not'
 t_DOT = r'\.'
-# t_RANGE = r'\.\.'
+t_AT = r'\@'
 # t_REPEAT = r'x'
+t_DOLLAR=r'\$'
 
 t_AUTO_INC = r'\+\+'
 t_AUTO_DEC = r'--'
@@ -137,12 +138,13 @@ reserved = {
     'scalar' : 'SCALAR',
     # 'CORE' : 'CORE',
     'do' : 'DO',
-    # 'exp' : 'EXP',
+    'new': 'NEW',
     'if' : 'IF',
     # 'lock' : 'LOCK',
     # 'm' : 'M',
     # 'no' : 'NO',      # Opposite of 'use'
     'package': 'PACKAGE', 
+    'struct' : 'STRUCT',
     # 'qr' : 'QR',
     'qw' : 'QW',
     # 's' : 'S',
