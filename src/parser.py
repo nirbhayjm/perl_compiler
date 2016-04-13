@@ -26,6 +26,7 @@ class Node(object):
 # Start symbol
 #==============================================================================
 start = 'program'
+MAX_ARRAY_SIZE = '100'
 
 def p_program(p):
     '''program          : M_global_next stmts
@@ -714,17 +715,27 @@ def p_assignment_exp_scalar(p):
 def p_assignment_exp_array(p):
     '''assignment_exp       : array_indexer ASSIGN OPEN_PAREN array_decl_list CLOSE_PAREN 
     '''
-
-    p[0] = p[4]
-    p[0]['type'] = 'array'
-    p[0]['place'] = p[4]['place']
+    p[0] = {
+        'type'  : 'array',
+        'place' : p[1]['place']
+    }
     for i,place in enumerate(p[4]['place']):
         TAC[ST.currentScope].emit('=',p[1]['place'] + '[' + str(i) + ']',place,'')
+
+def p_assignment_hash_decl(p):
+    '''assignment_exp       : hash_indexer  ASSIGN OPEN_PAREN hash_decl_list CLOSE_PAREN
+                            | hash_indexer  ASSIGN OPEN_PAREN hash_decl      CLOSE_PAREN
+    '''
+    p[0] = {
+        'type'  : 'hash',
+        'place' : p[1]['place']
+    }
+    for place in p[4]['place']:
+        TAC[ST.currentScope].emit('=',p[1]['place'] + '[' + place[0] + ']',place[1],'')
 
 def p_assignment_exp_general(p):
     '''assignment_exp       : OPEN_PAREN      assignment_exp    CLOSE_PAREN
 
-                            | hash_indexer  ASSIGN OPEN_PAREN    array_decl_list CLOSE_PAREN
                             | array_indexer ASSIGN SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN
                             | hash_indexer  ASSIGN SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN
                             | array_indexer ASSIGN QW DIVIDE     string_list DIVIDE
@@ -733,7 +744,6 @@ def p_assignment_exp_general(p):
                             | hash_indexer  ASSIGN hash_indexer
                             | hash_indexer  ASSIGN array_indexer
                             | array_indexer ASSIGN hash_indexer
-                            | hash_indexer  ASSIGN OPEN_PAREN hash_decl CLOSE_PAREN
                             | array_indexer ASSIGN ARRAY_ID OPEN_BRACE array_decl_list CLOSE_BRACE
                             | array_indexer ASSIGN KEYS HASH_ID
                             | array_indexer ASSIGN VALUES HASH_ID
@@ -1068,17 +1078,10 @@ def p_array_decl_list(p):
                             | arith_relat_exp COMMA array_decl_list
                             |
     '''
-    if len(p) == 4:
-        p[0] = {}
-        p[0]['place'] = [p[1]['place']]
-        for elem in p[3]['place']:
-            p[0]['place'].append(elem)
     if len(p) == 2:
-        if p[0] is None:
-            p[0] = {}
-            p[0]['place'] = [p[1]['place']]
-        else:
-            p[0]['place'].append(p[1]['place'])
+        p[0] = { 'place' : [p[1]['place']] }
+    elif len(p) == 4:
+        p[0]['place'] += p[3]['place']
 
 def p_string_list(p):
     '''string_list          : SUBROUTINE_ID string_list
@@ -1194,7 +1197,6 @@ def p_array_indexer(p):
                             | DEREFERENCE_OPEN array_indexer CLOSE_BRACE  
                             | ARGUMENT_ARRAY_ID
     '''
-
     if len(p) == 2:
         if not ST.lookupIdentifier(p[1][1:]):
             lhs_place = ST.createTemp()
@@ -1213,15 +1215,39 @@ def p_array_indexer(p):
 
 def p_hash_indexer(p):
     '''hash_indexer         : HASH_ID
-                            | HASH_ID OPEN_BRACE        arith_relat_exp CLOSE_BRACE
-                            | HASH_ID OPEN_BRACE        SUBROUTINE_ID   CLOSE_BRACE
+                            | HASH_ID OPEN_BRACE    arith_relat_exp CLOSE_BRACE
+                            | HASH_ID OPEN_BRACE    SUBROUTINE_ID   CLOSE_BRACE
     '''
-
+    idName = p[1][1:]
+    if not ST.lookupIdentifier(idName):
+        lhs_place = ST.createTemp()
+        lhs_type = 'hash'
+        ST.insertIdentifier(idName,lhs_place,idType='hash')
+    else:
+        lhs_place = ST.getAttribute(idName,'place')
+        lhs_type = ST.getAttribute(idName,'type')
+    p[0] = {
+        'place' : lhs_place,
+        'type' : lhs_type,
+    }
+    if len(p) == 5:
+        p[0]['place'] = lhs_place + '[' + p[3]['place'] + ']'
+            
 def p_hash_decl(p):
     '''hash_decl            : arith_relat_exp KEY_VALUE arith_relat_exp COMMA hash_decl
                             | arith_relat_exp KEY_VALUE arith_relat_exp
-                        
     '''
+    p[0] = { 'place' : [(p[1]['place'],p[3]['place'])] }
+    if len(p) == 6:
+        p[0]['place'] += p[5]['place']
+
+def p_hash_decl_list(p):
+    '''hash_decl_list       : arith_relat_exp COMMA arith_relat_exp COMMA hash_decl_list
+                            | arith_relat_exp COMMA arith_relat_exp
+    '''
+    p[0] = { 'place' : [(p[1]['place'],p[3]['place'])] }
+    if len(p) == 6:
+        p[0]['place'] += p[5]['place']
 
 #--- Syntax error rule
 def p_error(p):

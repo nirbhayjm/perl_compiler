@@ -14,6 +14,7 @@ class SymbolTable:
         }
 
         self.currentScope = 'main'
+        self.classes = []
 
         #--- Temporaries
         self.tempCount = -1
@@ -98,6 +99,26 @@ class SymbolTable:
                 return self.table[fullName]['label']
             scope = self.table[scope]['parent']
         return None
+
+    def declareClass(self,className):
+        # Classes can only be declared in main scope for now
+        assert(self.currentScope == 'main') 
+        self.table[className] = {
+            'name'          : className,
+            'type'          : 'class',
+            'parent'        : self.currentScope,
+            'identifiers'   : {},
+            'places'        : {},
+            'subroutines'   : {},
+        }
+        self.classes.append(className)
+        self.currentScope = className
+
+    def endDeclareClass(self):
+        self.currentScope = 'main'
+
+    def lookupClass(self,className):
+        return className in self.table['main']['classes']
 
     def lookupScope(self,idName):
         scope = self.currentScope

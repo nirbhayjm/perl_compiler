@@ -4,3 +4,6 @@ src/parsetab.py
 src/parser.out
 *.html
 bin/*
+out.s
+bin/out
+
