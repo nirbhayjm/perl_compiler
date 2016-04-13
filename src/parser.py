@@ -554,7 +554,7 @@ def p_hash_decl_struct(p):
     '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE   type_of_var COMMA hash_decl_struct
                             | SUBROUTINE_ID KEY_VALUE   type_of_var
                             | SUB SUBROUTINE_ID M_class_sub compound_stmt M_class_end COMMA hash_decl_struct
-                            | SUB SUBROUTINE_ID M_class_sub compound_stmt
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt M_class_end
     '''
     if len(p) == 4:
         if p[1] != 'sub':
@@ -564,15 +564,12 @@ def p_hash_decl_struct(p):
     elif len(p) == 6 :
         if p[1] != 'sub':
             p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+        else :
+            p[0] = { 'size' : 0 }  
     else :
-        p[0] = { 'size' : 0 }    
-    # print ST.currentScope    
-    if p[1] == 'sub':
-        if len(p) != 5 :
-            # print ST.currentScope
-            TAC[ST.currentScope].emit('ret','','','')
-            ST.endDeclareSub()    
-    else:        
+        p[0] = { 'size' : 0 }           
+    # print ST.currentScope       
+    if p[1] != 'sub' :        
         ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
 
 def p_M_class_sub(p):
@@ -850,7 +847,6 @@ def p_assignment_exp_scalar(p):
         if 'deref' in p[3]:
             TAC[ST.currentScope].emit('=*',temp,src_place,'')
             TAC[ST.currentScope].emit('=',src_place,temp,'')
-
         TAC[ST.currentScope].emit('=',assignee_place,src_place,'')
         
         if 'deref' in p[1]:
@@ -1240,6 +1236,7 @@ def p_array_decl_list(p):
         # print "p3:",p[3]
         p[0] = {}
         p[0]['place'] = [p[1]['place']] + p[3]['place']
+
 
 def p_string_list(p):
     '''string_list          : SUBROUTINE_ID string_list
