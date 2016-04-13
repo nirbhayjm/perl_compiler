@@ -14,7 +14,7 @@ class SymbolTable:
         }
 
         self.currentScope = 'main'
-        self.classes = {}
+        self.classes = []
 
         #--- Temporaries
         self.tempCount = -1
@@ -33,30 +33,47 @@ class SymbolTable:
         self.subCount += 1
         return self.subPrefix + str(self.subCount)
 
-    def insertIdentifier(self,idName,place,type_scope='main',idType='NoType', size = 4):
-        if type_scope == 'my':
-            setScope = self.currentScope
-        else:
-            setScope = 'main'
+    def insertIdentifier(self,idName,place=None,type_scope='main',idType='NoType', size=None):
+        if size is not None:
+            if idType == 'scalar':
+                size = 4
+            elif idType == 'array':
+                size = 400
+            elif idType == 'hash' :
+                size = 400
+            elif idType == 'struct' :
+                print "ST:insertIdentifier: ERROR! Need size of struct!"
+                assert(False)
+            else:
+                print "Can't determine size! No idType given."
 
-        if idType == 'scalar':
-            size = 4
-        elif idType == 'array':
-            size = 400
-        elif idType == 'hash' :
-            size = 400
-        elif idType == 'struct' :
-            size = size
-            
-        self.table[setScope]['identifiers'][idName] = {
-            'place' : place,
-            'type' : idType,
-            'size' : size
-        }
-        self.table[setScope]['places'][place] = idName
+        # Class variable
+        if self.currentlyInClass():
+            className = self.lookupCurrentClass()
+            self.table[className]['identifiers'][idName] = {
+                'offset'    : self.table[className]['class_size'],
+                'type'      : idType,
+                'size'      : size
+            }
+            self.table[className]['class_size'] += size
+            self.table[className]['places'][idName] = idName
+            if 'i' in self.DEBUG:
+                print "ST: Inserted in class:",className," identifier :",idName,"-->",place
 
-        if 'i' in self.DEBUG:
-            print "ST: Inserted new identifier :",idName,"-->",place
+        else: 
+            if type_scope == 'my': # Local variable
+                setScope = self.currentScope
+            else:
+                setScope = 'main' # Global variable
+                
+            self.table[setScope]['identifiers'][idName] = {
+                'place' : place,
+                'type' : idType,
+                'size' : size
+            }
+            self.table[setScope]['places'][place] = idName
+            if 'i' in self.DEBUG:
+                print "ST: Inserted new identifier :",idName,"-->",place
 
     def getAttribute(self,idName,atrribute):
         scope = self.lookupScope(idName)
@@ -101,20 +118,19 @@ class SymbolTable:
         return None
 
     def declareClass(self,className):
+        # print "In class!"
         # Classes can only be declared in main scope for now
-        assert(self.currentScope == 'main') 
+        assert(self.currentScope == 'main')
         self.table[className] = {
             'name'          : className,
             'type'          : 'class',
             'parent'        : self.currentScope,
             'identifiers'   : {},
+            'class_size'    : 0,
             'places'        : {},
             'subroutines'   : {},
         }
-        self.classes[className] = {
-            'class_size' : 0,
-            'id_offsets' : {}
-        }
+        self.classes.append(className)
         self.currentScope = className
 
     def endDeclareClass(self):
@@ -123,8 +139,15 @@ class SymbolTable:
     def currentlyInClass(self):
         return self.table[self.currentScope]['type'] == 'class'
 
-    def lookupClass(self,className):
-        return className in self.table['main']['classes']
+    def getClassSize(self,className):
+        if className in self.classes:
+            return str( self.table[className]['class_size'] )
+        else:
+            return "ERROR! Class DNE."
+
+    def lookupCurrentClass(self):
+        assert(self.currentlyInClass)
+        return self.currentScope
 
     def lookupScope(self,idName):
         scope = self.currentScope

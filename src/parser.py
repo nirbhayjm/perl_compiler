@@ -533,58 +533,46 @@ def p_subroutine_control(p):
     TAC[ST.currentScope].emit('ret',p[2]['place'],'','')
 
 #==============================================================================
-# Struct rules
+# Class/Struct rules
 #==============================================================================
 
 def p_struct_decl(p):
-    '''struct_decl          : STRUCT OPEN_PAREN SUBROUTINE_ID KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET CLOSE_PAREN
-                            | STRUCT OPEN_PAREN SUBROUTINE_ID KEY_VALUE OPEN_BRACE hash_decl_struct CLOSE_BRACE CLOSE_PAREN
-                            | STRUCT SUBROUTINE_ID KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET 
-                            | STRUCT SUBROUTINE_ID KEY_VALUE OPEN_BRACE hash_decl_struct CLOSE_BRACE 
+    '''struct_decl          : STRUCT OPEN_PAREN SUBROUTINE_ID M_classInit KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET CLOSE_PAREN
+                            | STRUCT OPEN_PAREN SUBROUTINE_ID M_classInit KEY_VALUE OPEN_BRACE    hash_decl_struct CLOSE_BRACE    CLOSE_PAREN
+                            | STRUCT SUBROUTINE_ID M_classInit KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET 
+                            | STRUCT SUBROUTINE_ID M_classInit KEY_VALUE OPEN_BRACE    hash_decl_struct CLOSE_BRACE 
     '''
-
-    if len(p) == 9:
-        p[0] = {
-        'size' = p[6]['size']
-        }
+    if len(p) == 10:
+        p[0] = { 'size' : p[7]['size'] }
     else :
-        p[0] = {
-        'size' = p[5]['size']
-        }    
+        p[0] = { 'size' : p[6]['size'] }
+    ST.endDeclareClass()
 
+def p_M_classInit(p):
+    '''M_classInit :'''
+    ST.declareClass(p[-1])
+
+#--- Hash declaration list for declaring variables in class
 def p_hash_decl_struct(p):
-    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
-                            | SUBROUTINE_ID KEY_VALUE type_of_var
+    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE   type_of_var COMMA hash_decl_struct
+                            | SUBROUTINE_ID KEY_VALUE   type_of_var
+                            
                             | SUB SUBROUTINE_ID compound_stmt
-                        
     '''
-    # p[0] = p[-2]
-
-
     if len(p) == 4:
         if p[1] != 'sub':
-            p[0] = {
-            'size' = p[3]['size']
-            }
-    else :
-        p[0] =
-        {
-        'size' = p[3]['size'] + p[5]['size']
-        }    
-    if not ST.lookupIdentifier(p[1][1:]):
-        lhs_place = ST.createTemp()
-        ST.insertIdentifier(p[1][1:],lhs_place,type_scope='my',idType=p[3]['type'])
-        p[0] = {
-            'place' : lhs_place,
-            'type' : 'struct'
-        }
-    else:
-        lhs_place = ST.getAttribute(p[1][1:],'place')
-        lhs_type = ST.getAttribute(p[1][1:],'type')
-        p[0] = {
-            'place' : lhs_place,
-            'type' : lhs_type
-        }
+            p[0] = { 'size' : p[3]['size'] }
+    elif len(p) == 6 :
+        p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+
+    ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
+
+#--- Hash declaration list for calling new instance of class
+def p_struct_arg_hash(p):
+    '''struct_arg_hash      : struct_arg_hash COMMA SUBROUTINE_ID KEY_VALUE SUBROUTINE_ID 
+                            |                       SUBROUTINE_ID KEY_VALUE SUBROUTINE_ID
+    '''
+    
 
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
@@ -609,14 +597,27 @@ def p_type_of_var(p):
             }
     else :
         p[0] = {
-                'type':  'struct'
+                'type':  'struct',
                 'size':  ST.getAttribute(p[1][1:],'size')   
             }         
 
 def p_primary_exp_struct(p):
-    '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN hash_decl CLOSE_PAREN
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN M_structAlloc struct_arg_hash CLOSE_PAREN
     '''
-    
+    p[0] = p[5]
+
+def p_M_structAlloc(p):
+    '''M_structAlloc: '''
+    thisPtr = ST.createTemp()
+    classSize = ST.getClassSize(p[-4])
+
+    p[0] = {
+        'place' : thisPtr,
+        'type' : p[-4],
+        'size' : classSize
+    }
+
+    TAC.emit( 'new',classSize,thisPtr )
 
 #==============================================================================
 # 'print' function implementation
@@ -732,7 +733,7 @@ def p_assignment_hash_decl(p):
         'place' : p[1]['place']
     }
     for place in p[4]['place']:
-        TAC[ST.currentScope].emit('=',p[1]['place'] + '[' + place[0] + ']',place[1],'')
+        TAC[ST.currentScope].emit('=',p[1]['place'] + '{' + place[0] + '}',place[1],'')
 
 def p_assignment_exp_general(p):
     '''assignment_exp       : OPEN_PAREN      assignment_exp    CLOSE_PAREN
@@ -1227,7 +1228,7 @@ def p_hash_indexer(p):
         'type' : lhs_type,
     }
     if len(p) == 5:
-        p[0]['place'] = lhs_place + '[' + p[3]['place'] + ']'
+        p[0]['place'] = lhs_place + '{' + p[3]['place'] + '}'
             
 def p_hash_decl(p):
     '''hash_decl            : arith_relat_exp KEY_VALUE arith_relat_exp COMMA hash_decl
@@ -1290,7 +1291,7 @@ precedence = (
 # End of Perl grammar
 #==============================================================================
 
-ST = SymbolTable.SymbolTable(debug='')
+ST = SymbolTable.SymbolTable(debug='i')
 TAC = {}
 TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
 parser = yacc.yacc()
@@ -1301,7 +1302,7 @@ with open(sys.argv[1],'r') as file:
     if len(sys.argv) > 2:
         option = int(sys.argv[2])
     else:
-        option = 1
+        option = 0
 
     if option > 0:
         print "ThreeAddressCode :"
