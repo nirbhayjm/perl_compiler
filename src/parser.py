@@ -88,6 +88,8 @@ def p_stmt(p):
                         | type_scope M_TS decl_list EOS
                         | PACKAGE SUBROUTINE_ID     EOS
                         | exit_stmt                 EOS
+                        | struct_decl               EOS
+
     '''
     p[0] = p[1]
     TAC[ST.currentScope].placeLabel(p[-1]['labels']['Stmt_End'])
@@ -531,6 +533,67 @@ def p_subroutine_control(p):
     TAC[ST.currentScope].emit('ret',p[2]['place'],'','')
 
 #==============================================================================
+# Struct rules
+#==============================================================================
+
+def p_struct_decl(p):
+    '''struct_decl          : STRUCT OPEN_PAREN SUBROUTINE_ID KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET CLOSE_PAREN
+                            | STRUCT OPEN_PAREN SUBROUTINE_ID KEY_VALUE OPEN_BRACE hash_decl_struct CLOSE_BRACE CLOSE_PAREN
+                            | STRUCT SUBROUTINE_ID KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET 
+                            | STRUCT SUBROUTINE_ID KEY_VALUE OPEN_BRACE hash_decl_struct CLOSE_BRACE 
+    '''
+
+
+   
+def p_hash_decl_struct(p):
+    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
+                            | SUBROUTINE_ID KEY_VALUE type_of_var
+                        
+    '''
+    p[0] = p[-2]
+
+    # if len(p) == 2:
+    if not ST.lookupIdentifier(p[1][1:]):
+        lhs_place = ST.createTemp()
+        ST.insertIdentifier(p[1][1:],lhs_place,type_scope=p[-2],idType='scalar')
+        p[0] = {
+            'place' : lhs_place,
+            'type' : 'scalar'
+        }
+    else:
+        lhs_place = ST.getAttribute(p[1][1:],'place')
+        lhs_type = ST.getAttribute(p[1][1:],'type')
+        p[0] = {
+            'place' : lhs_place,
+            'type' : lhs_type
+        }
+    
+
+def p_type_of_var(p):
+    '''type_of_var          : DOLLAR
+                            | AT
+                            | MODULUS
+                            | SUBROUTINE_ID                        
+    '''
+    if p[1] == '$':
+        p[0] = {
+                'type':  'scalar'
+            }
+    elif p[1] == '@':
+        p[0] = {
+                'type':  'array'
+            }
+    elif p[1] == '%':
+        p[0] = {
+                'type':  'hash'
+            }
+    else :
+        p[0] = {
+                'type':  'struct'
+            }         
+
+
+#==============================================================================
 # 'print' function implementation
 #==============================================================================
 
@@ -965,6 +1028,11 @@ def p_primary_exp_misc(p):
     if len(p) == 2:
         p[0] = p[1]
     # print p[0]
+
+def p_primary_exp_struct(p):
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN hash_decl CLOSE_PAREN
+     '''
+
 
 #--- added open_paren and close_paren around each of the expr, like in push expr, added a rule push (expr), 
 def p_array_op_exp(p):
