@@ -1191,7 +1191,7 @@ def p_primary_exp_subroutine_call(p):
         'size': 4
     }
     if p[3] is not None:
-        for param in p[3]['place']:
+        for param in reversed(p[3]['place']):
             TAC[ST.currentScope].emit('param',param,'','')
     TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],'')
 
