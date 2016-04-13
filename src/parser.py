@@ -1146,7 +1146,7 @@ def p_postfix_exp(p):
     # print p[0]
     if len(p) == 3:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
         # print "NO"
-        print p[1]['place']
+        # print p[1]['place']
         lhs_place = ST.createTemp()
         # p[0] = {
         #     'place' : lhs_place,
