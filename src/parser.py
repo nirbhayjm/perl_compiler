@@ -858,9 +858,12 @@ def p_assignment_exp_scalar(p):
         if 'deref' in p[1]:
             TAC[ST.currentScope].emit('*=',lhs_place,assignee_place,'')
 
-    if p[1]['type'] != p[3]['type']:
-        for attr in p[3]:
-            ST.addAttribute(p[1]['place'],attr,p[3][attr])
+    try:
+        if p[1]['type'] != p[3]['type']:
+            for attr in p[3]:
+                ST.addAttribute(p[1]['place'],attr,p[3][attr])
+    except:
+        pass
 
     TAC[ST.currentScope].placeLabel(post_label)
     p[0] = p[1]
@@ -992,11 +995,8 @@ def p_arith_relat_exp(p):
             p[3]['place'] = temp
 
         lhs_place = ST.createTemp()
-        p[0] = {
-            'place': lhs_place,
-            'type':'NoType'
-
-        }
+        p[0] = p[1].copy()
+        p[0]['place'] = lhs_place
 
         if p[2] == '+':
             TAC[ST.currentScope].emit('+',lhs_place,p[1]['place'],p[3]['place'])
@@ -1138,7 +1138,9 @@ def p_postfix_exp(p):
                             | primary_exp AUTO_DEC
     '''
     p[0] = p[1]
+    # print p[0]
     if len(p) == 3:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
+        # print "NO"
         lhs_place = ST.createTemp()
         p[0]['place'] = lhs_place
         # p[0] = {
@@ -1194,9 +1196,6 @@ def p_primary_exp_subroutine_call(p):
             TAC[ST.currentScope].emit('param',param,'','')
     TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],'')
 
-
-
-
 def p_primary_exp_misc(p):
     '''primary_exp          : QW DIVIDE string_list DIVIDE
                             | QW OPEN_PAREN string_list CLOSE_PAREN
@@ -1234,10 +1233,14 @@ def p_array_decl_list(p):
                             | arith_relat_exp COMMA array_decl_list
                             |
     '''
+    # print p[1]
     if len(p) == 2:
+        print "p0:",p[1]['place']
         p[0] = { 'place' : [p[1]['place']] }
     elif len(p) == 4:
-        p[0]['place'] += p[3]['place']
+        print "p3:",p[3]
+        p[0] = {}
+        p[0]['place'] = [p[1]['place']] + p[3]['place']
 
 def p_string_list(p):
     '''string_list          : SUBROUTINE_ID string_list
