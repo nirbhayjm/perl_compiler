@@ -555,15 +555,17 @@ def p_struct_decl(p):
 def p_hash_decl_struct(p):
     '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
                             | SUBROUTINE_ID KEY_VALUE type_of_var
+                            | SUB SUBROUTINE_ID compound_stmt
                         
     '''
     # p[0] = p[-2]
 
 
     if len(p) == 4:
-        p[0] = {
-        'size' = p[3]['size']
-        }
+        if p[1] != 'sub':
+            p[0] = {
+            'size' = p[3]['size']
+            }
     else :
         p[0] =
         {
