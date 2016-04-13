@@ -737,7 +737,7 @@ def p_decl_var(p):
         else:
             lhs_place = ST.getAttribute(p[1][1:],'place')
             lhs_type = ST.getAttribute(p[1][1:],'type')
-            lhs_size = ST.getAttribute(p[1][1:],'type')
+            lhs_size = ST.getAttribute(p[1][1:],'size')
             p[0] = {
                 'place' : lhs_place,
                 'type' : lhs_type,
@@ -750,28 +750,45 @@ def p_assignment_exp_scalar(p):
     '''assignment_exp       : scalar_indexer  assignment_op     arith_relat_exp     post_selection
     '''
 
+    post_label = TAC[ST.currentScope].makeLabel()
+    lhs_place = None
+    assignee_place = None
+
+    if 'deref' in p[1]:
+        lhs_place       = p[1]['place']
+        assignee_place  = ST.createTemp()
+    else:
+        lhs_place = p[1]['place']
+        assignee_place = p[1]['place']
+    #--- Do not change this^
+    src_place       = p[3]['place']
+
     if p[4] != None: #--- Post-selection
         # print p[4]
         if p[4]['cond'] == 'if':
-            TAC[ST.currentScope].emit('ifgoto','eq',p[4]['exp_place'],'0',TAC[ST.currentScope].getNextQuad()+2)
+            TAC[ST.currentScope].addPatchList(post_label)
+            TAC[ST.currentScope].emit('ifgoto','eq',p[4]['exp_place'],'0',post_label)
         elif p[4]['cond'] == 'unless':
-            TAC[ST.currentScope].emit('ifgoto','ne',p[4]['exp_place'],'0',TAC[ST.currentScope].getNextQuad()+2)
+            TAC[ST.currentScope].addPatchList(post_label)
+            TAC[ST.currentScope].emit('ifgoto','ne',p[4]['exp_place'],'0',post_label)
 
-    if p[2] == "=":
-        if 'deref' in p[1]:
-            print "OKAY1"
-            TAC[ST.currentScope].emit('*=',p[1]['place'],p[3]['place'],'')
-        elif 'deref' in p[3]:
-            print "OKAY2"
-            TAC[ST.currentScope].emit('=*',p[1]['place'],p[3]['place'],'')
-        TAC[ST.currentScope].emit('=',p[1]['place'],p[3]['place'],'')
+    if p[2] != "=":
+        TAC[ST.currentScope].emit(p[2][0],assignee_place,assignee_place,src_place)
     else:
-        TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],p[3]['place'])
+        if 'deref' in p[3]:
+            TAC[ST.currentScope].emit('=*',rhs_temp,src_place,'')
+            TAC[ST.currentScope].emit('=',src_place,temp,'')
+
+        TAC[ST.currentScope].emit('=',assignee_place,src_place,'')
+        
+        if 'deref' in p[1]:
+            TAC[ST.currentScope].emit('*=',lhs_place,assignee_place,'')
 
     if p[1]['type'] != p[3]['type']:
         for attr in p[3]:
             ST.addAttribute(p[1]['place'],attr,p[3][attr])
 
+    TAC[ST.currentScope].placeLabel(post_label)
     p[0] = p[1]
 
 def p_assignment_exp_array(p):
