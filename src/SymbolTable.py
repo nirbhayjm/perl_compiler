@@ -56,7 +56,7 @@ class SymbolTable:
                 'size'      : size
             }
             self.table[className]['class_size'] += size
-            self.table[className]['places'][idName] = idName
+            # self.table[className]['places'][place] = idName
             if 'i' in self.DEBUG:
                 print "ST: Inserted identifier :",idName,"-->",className
 
@@ -75,13 +75,26 @@ class SymbolTable:
             if 'i' in self.DEBUG:
                 print "ST: Inserted new identifier :",idName,"-->",place
 
+    def addAttribute(self,placeName,attribute,value=None):
+        idName = self.getIdNameByPlace(placeName)
+        assert(idName != None)
+        scope = self.lookupScope(idName)
+        assert(scope != None)
+        self.table[scope]['identifiers'][idName][attribute] = value
+
     def getAttribute(self,idName,atrribute):
         scope = self.lookupScope(idName)
-        if scope is not None:
-            # The python get() function of dictionaries returns the value with key = attribute
-            return self.table[scope]['identifiers'][idName].get(atrribute)
-        else:
-            return None
+        assert(scope != None)
+        # The python get() function of dictionaries returns the value with key = attribute
+        return self.table[scope]['identifiers'][idName].get(atrribute)
+
+    def getAllAttributes(self,placeName):
+        idName = self.getIdNameByPlace(placeName)
+        assert(idName != None)
+        # print "IDNAME!:",idName
+        scope = self.lookupScope(idName)
+        assert(scope != None)
+        return self.table[scope]['identifiers'][idName].keys()
 
     def declareSub(self,subName):
         fullName = self.currentScope + '/' + subName
@@ -130,6 +143,8 @@ class SymbolTable:
             'places'        : {},
             'subroutines'   : {},
         }
+        if 'i' in self.DEBUG:
+            print "ST: Declared new class: ",className
         self.classes.append(className)
         self.currentScope = className
 
@@ -150,6 +165,7 @@ class SymbolTable:
         return self.currentScope
 
     def getIdOffset(self,idName,className):
+        # print className
         assert(className in self.classes)
         assert(idName in self.table[className]['identifiers'])
         return self.table[className]['identifiers'][idName]['offset']
@@ -164,3 +180,12 @@ class SymbolTable:
 
     def lookupIdentifier(self,idName):
         return self.lookupScope(idName) != None
+
+    def getIdNameByPlace(self,placeName):
+        scope = self.currentScope
+        while scope is not None:
+            # print "Checking :",placeName,"in :", self.table[scope]['places']
+            if placeName in self.table[scope]['places']:
+                return self.table[scope]['places'][placeName]
+            scope = self.table[scope]['parent']
+        return None
