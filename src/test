@@ -5,3 +5,4 @@ struct Breed =>
 };
 
 $cat = Breed->new(name => 1, cross => 10);
+$cat->name = 2;

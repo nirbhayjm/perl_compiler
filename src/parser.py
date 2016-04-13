@@ -578,9 +578,9 @@ def p_struct_arg_hash(p):
     else:
         idName  = p[3]
         src     = p[5]['place']
-    
+
     thisPtr   = p[-1]['place']
-    className = p[-1]['type']
+    className = p[-1]['target']
     offset    = ST.getIdOffset(idName,className)
     varPtr    = ST.createTemp()
 
@@ -621,16 +621,49 @@ def p_primary_exp_struct(p):
 
 def p_M_structAlloc(p):
     '''M_structAlloc :'''
-    thisPtr = ST.createTemp()
+    thisPtr   = ST.createTemp()
     classSize = ST.getClassSize(p[-4])
 
     p[0] = {
         'place' : thisPtr,
-        'type'  : p[-4],
-        'size'  : classSize
+        'type'  : 'address',
+        'target': p[-4]
     }
-
     TAC[ST.currentScope].emit( 'new',classSize,thisPtr,'' )
+
+def p_object_var_deref(p): 
+    '''scalar_indexer       : SCALAR_ID DEREFERENCE SUBROUTINE_ID
+    '''
+    #--- Example: $cat->furry
+    #--- Note that this is only makes a copy of the data in $cat->furry
+    #--- Hence, it will only be used in RHS of
+    idName = p[1][1:]
+    idType = None
+
+    if ST.lookupIdentifier(idName):
+        idType = ST.getAttribute(idName,'type')
+
+    if idType == 'address':
+        className   = ST.getAttribute(idName,'target') #p[1]['target']
+        thisPtr     = ST.getAttribute(idName,'place') #p[1]['place']
+        offset      = ST.getIdOffset(p[3],className)
+        varPtr      = ST.createTemp()
+        # lhs_place   = ST.createTemp()
+        lhs_type    = ST.table[className]['identifiers'][p[3]]['type']
+        lhs_size    = ST.table[className]['identifiers'][p[3]]['size']
+
+        p[0] = {
+            'place'     : varPtr,
+            'type'      : lhs_type,
+            'size'      : lhs_size,
+            'deref'     : 'True',
+        }
+
+        TAC[ST.currentScope].emit( '+',varPtr,thisPtr,offset,'' )
+        # TAC[ST.currentScope].emit( '=*',lhs_place,varPtr,'' )
+    else:
+        print "Error! Type:",idType," is not the pointer of the correct object!"
+        assert(False)
 
 #==============================================================================
 # 'print' function implementation
@@ -698,14 +731,17 @@ def p_decl_var(p):
             ST.insertIdentifier(p[1][1:],lhs_place,type_scope=p[-2],idType='scalar')
             p[0] = {
                 'place' : lhs_place,
-                'type' : 'scalar'
+                'type' : 'scalar',
+                'size' : 4,
             }
         else:
             lhs_place = ST.getAttribute(p[1][1:],'place')
             lhs_type = ST.getAttribute(p[1][1:],'type')
+            lhs_size = ST.getAttribute(p[1][1:],'type')
             p[0] = {
                 'place' : lhs_place,
-                'type' : lhs_type
+                'type' : lhs_type,
+                'size' : lhs_size
             }
 
 # array_indexer ASSIGN SUBROUTINE_ID SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN added to support objects
@@ -722,9 +758,20 @@ def p_assignment_exp_scalar(p):
             TAC[ST.currentScope].emit('ifgoto','ne',p[4]['exp_place'],'0',TAC[ST.currentScope].getNextQuad()+2)
 
     if p[2] == "=":
+        if 'deref' in p[1]:
+            print "OKAY1"
+            TAC[ST.currentScope].emit('*=',p[1]['place'],p[3]['place'],'')
+        elif 'deref' in p[3]:
+            print "OKAY2"
+            TAC[ST.currentScope].emit('=*',p[1]['place'],p[3]['place'],'')
         TAC[ST.currentScope].emit('=',p[1]['place'],p[3]['place'],'')
     else:
         TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],p[3]['place'])
+
+    if p[1]['type'] != p[3]['type']:
+        for attr in p[3]:
+            ST.addAttribute(p[1]['place'],attr,p[3][attr])
+
     p[0] = p[1]
 
 def p_assignment_exp_array(p):
@@ -843,6 +890,7 @@ def p_arith_relat_exp(p):
         temp = ST.createTemp()
         TAC[ST.currentScope].emit('=',temp,p[1]['place'],'')
         p[1]['place'] = temp
+
     if len(p) == 2:
         p[0] = p[1]
     
@@ -958,10 +1006,12 @@ def p_unary_exp(p):
     else:
         #--- NOTE: Unary operators ++,-- are first applied then postfix_exp is assigned to lhs
         lhs_place = ST.createTemp()
-        p[0] = {
-            'place' : lhs_place,
-            'type' : p[2]['type']
-        }
+        p[0] = p[2]
+        p[0]['place'] = lhs_place
+        # p[0] = {
+        #     'place' : lhs_place,
+        #     'type' : p[2]['type']
+        # }
 
         if p[1] == '-':
             TAC[ST.currentScope].emit('-',lhs_place,'0',p[2]['place'])
@@ -972,8 +1022,9 @@ def p_unary_exp(p):
         elif p[1] == "\\":
             p[0] = {
                 'place'     : lhs_place,
+                'size'      : 4,
                 'type'      : 'address',
-                # 'addr_type' : p[2]['type']
+                'target'    : p[2]['type']
             }
             TAC[ST.currentScope].emit('=&',lhs_place,p[2]['place'],'')
 
@@ -994,15 +1045,14 @@ def p_postfix_exp(p):
                             | primary_exp AUTO_INC
                             | primary_exp AUTO_DEC
     '''
-    if len(p) == 2:
-        p[0] = p[1]
-    else:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
+    p[0] = p[1]
+    if len(p) == 3:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
         lhs_place = ST.createTemp()
-        p[0] = {
-            'place' : lhs_place,
-            'type' : p[1]['type']
-        }
-
+        p[0]['place'] = lhs_place
+        # p[0] = {
+        #     'place' : lhs_place,
+        #     'type' : p[1]['type']
+        # }
         #--- NOTE: POST Increment i.e. primary_exp is incremented after assignment to lhs_place
         TAC[ST.currentScope].emit('=',lhs_place,p[1]['place'],'')
         TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],'1')
@@ -1016,15 +1066,14 @@ def p_primary_exp_literal(p):
                             | HEX
                             | STRING
     '''
-
-    # lhs_place = ST.createTemp()
+    lhs_place = ST.createTemp()
     p[0] = {
-        'place' : p[1],
-        'type' : 'literal',
+        'place': lhs_place,
+        'type' : 'scalar',
+        'size' : 4
         # 'value': p[1]
     }
-
-    # TAC[ST.currentScope].emit('=',lhs_place,p[1],'')
+    TAC[ST.currentScope].emit('=',lhs_place,p[1],'')
 
 def p_primary_exp_indexer(p):
     '''primary_exp          : scalar_indexer
