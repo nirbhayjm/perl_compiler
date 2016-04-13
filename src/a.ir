@@ -1,0 +1,36 @@
+ST: Declared new class:  Breed
+Breed/c
+ST: Inserted new identifier : ab --> t0
+ST: Inserted new identifier : bc --> t2
+Breed/a
+ST: Inserted new identifier : a --> t4
+Breed/a
+ST: Inserted identifier : cross --> Breed
+ST: Inserted identifier : name --> Breed
+ST: Inserted new identifier : cat --> t6
+ST: Inserted new identifier : b --> t12
+1, new, 8, t7
+2, =, t8, 2
+3, +, t9, t7, 4
+4, *=, t9, t8
+5, =, t10, 1
+6, +, t11, t7, 0
+7, *=, t11, t10
+8, =, t6, t7
+9, param, t7
+10, call, Subroutine1, t13
+11, =, t12, t13
+12, print, t13
+13, exit, 0
+14, label, Subroutine2
+15, =, t5, 5
+16, =, t4, t5
+17, ret, t4
+18, ret
+19, label, Subroutine1
+20, =, t1, 9
+21, =, t0, t1
+22, =, t3, 2
+23, =, t2, t3
+24, ret, t0
+25, ret

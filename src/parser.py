@@ -553,33 +553,44 @@ def p_M_classInit(p):
     ST.declareClass(p[-1])
 
 #--- Hash declaration list for declaring variables in class
-def p_hash_decl_struct(p):  
-    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
-                            | SUBROUTINE_ID KEY_VALUE type_of_var
-                            | SUB SUBROUTINE_ID M_class_sub compound_stmt COMMA hash_decl_struct
+def p_hash_decl_struct(p):
+    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE   type_of_var COMMA hash_decl_struct
+                            | SUBROUTINE_ID KEY_VALUE   type_of_var
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt M_class_end COMMA hash_decl_struct
                             | SUB SUBROUTINE_ID M_class_sub compound_stmt
-    '''                        
+    '''
     if len(p) == 4:
         if p[1] != 'sub':
-            p[0] = {
-            'size' : p[3]['size']
-            }
+            p[0] = { 'size' : p[3]['size'] }
+        else :
+            p[0] = { 'size' : 0 }    
+    elif len(p) == 6 :
+        if p[1] != 'sub':
+            p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
     else :
-        p[0] = {
-        'size' : p[3]['size'] + p[5]['size']
-        }    
-
-    if p[1] == 'sub' :
-        TAC[ST.currentScope].emit('ret','','','')
-        ST.endDeclareSub()
+        p[0] = { 'size' : 0 }    
+    # print ST.currentScope    
+    if p[1] == 'sub':
+        if len(p) != 5 :
+            print ST.currentScope
+            TAC[ST.currentScope].emit('ret','','','')
+            ST.endDeclareSub()    
+    else:        
+        ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
 
 def p_M_class_sub(p):
     '''M_class_sub : '''
     #TODO: Check if method is already declared in current scope    
 
     ST.declareSub(p[-1])
+    print ST.currentScope
     TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
     TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
+
+def p_M_class_end(p):
+    '''M_class_end  :  ''' 
+    TAC[ST.currentScope].emit('ret','','','')
+    ST.endDeclareSub()     
 
 #--- Hash declaration list for calling new instance of class
 def p_struct_arg_hash(p):
@@ -633,7 +644,48 @@ def p_primary_exp_struct(p):
     '''
     p[0] = p[5]
 
+def p_primary_exp_subroutine_struct(p):
+    '''primary_exp          : SCALAR_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN
+    '''
+
+    lhs_place = ST.createTemp()
+    p[0] = {
+        'place': lhs_place,
+        'type': 'func'
+    }
+
+    # assert (ST.lookupIdentifier(p[1][1:]))
+    lhs_place = ST.getAttribute(p[1][1:],'place')
+    lhs_type = ST.getAttribute(p[1][1:],'type')
+    lhs_target = ST.getAttribute(p[1][1:],'target')
+        
+    TAC[ST.currentScope].emit('param', lhs_place ,'','')
+    if p[5] is not None:
+        for param in p[5]['place']:
+            TAC[ST.currentScope].emit('param',param,'','')
+
+    idName = p[1][1:]
+    idType = None
+
+    if ST.lookupIdentifier(idName):
+        idType = ST.getAttribute(idName,'type')
+    # print idType    
+    if idType == 'address':
+        className   = ST.getAttribute(idName,'target') #p[1]['target']
+        thisPtr     = ST.getAttribute(idName,'place') #p[1]['place']
+        # offset      = ST.getIdOffset(p[3],className)
+        varPtr      = ST.createTemp()
+        # lhs_place   = ST.createTemp()
+        lhs_type    = ST.table[className]['subroutines'][p[3]]['fullName']
+        label_name = ST.table[lhs_type]['label']
+        # lhs_size    = ST.table[className]['identifiers'][p[3]]['size']
+        # print lhs_type, label_name
+
+
+    TAC[ST.currentScope].emit('call',label_name,p[0]['place'],'')
+
 def p_M_structAlloc(p):
+
     '''M_structAlloc :'''
     thisPtr   = ST.createTemp()
     classSize = ST.getClassSize(p[-4])
@@ -753,11 +805,12 @@ def p_decl_var(p):
                 'place' : lhs_place,
                 'type' : 'scalar',
                 'size' : 4,
+
             }
         else:
             lhs_place = ST.getAttribute(p[1][1:],'place')
             lhs_type = ST.getAttribute(p[1][1:],'type')
-            lhs_size = ST.getAttribute(p[1][1:],'size')
+            lhs_type = ST.getAttribute(p[1][1:],'size')
             p[0] = {
                 'place' : lhs_place,
                 'type' : lhs_type,
@@ -942,6 +995,7 @@ def p_arith_relat_exp(p):
         p[0] = {
             'place': lhs_place,
             'type':'NoType'
+
         }
 
         if p[2] == '+':
@@ -1132,7 +1186,8 @@ def p_primary_exp_subroutine_call(p):
     lhs_place = ST.createTemp()
     p[0] = {
         'place': lhs_place,
-        'type': 'func'
+        'type': 'func',
+        'size': 4
     }
     if p[3] is not None:
         for param in p[3]['place']:
