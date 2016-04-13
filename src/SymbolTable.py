@@ -14,7 +14,7 @@ class SymbolTable:
         }
 
         self.currentScope = 'main'
-        self.classes = []
+        self.classes = {}
 
         #--- Temporaries
         self.tempCount = -1
@@ -46,7 +46,7 @@ class SymbolTable:
         elif idType == 'hash' :
             size = 400
         elif idType == 'struct' :
-            size = size            
+            size = size
             
         self.table[setScope]['identifiers'][idName] = {
             'place' : place,
@@ -111,11 +111,17 @@ class SymbolTable:
             'places'        : {},
             'subroutines'   : {},
         }
-        self.classes.append(className)
+        self.classes[className] = {
+            'class_size' : 0,
+            'id_offsets' : {}
+        }
         self.currentScope = className
 
     def endDeclareClass(self):
         self.currentScope = 'main'
+
+    def currentlyInClass(self):
+        return self.table[self.currentScope]['type'] == 'class'
 
     def lookupClass(self,className):
         return className in self.table['main']['classes']
