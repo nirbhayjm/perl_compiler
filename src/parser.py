@@ -542,6 +542,15 @@ def p_struct_decl(p):
                             | STRUCT SUBROUTINE_ID KEY_VALUE OPEN_BRACE hash_decl_struct CLOSE_BRACE 
     '''
 
+    if len(p) == 9:
+        p[0] = {
+        'size' = p[6]['size']
+        }
+    else :
+        p[0] = {
+        'size' = p[5]['size']
+        }    
+
 
    
 def p_hash_decl_struct(p):
@@ -549,15 +558,24 @@ def p_hash_decl_struct(p):
                             | SUBROUTINE_ID KEY_VALUE type_of_var
                         
     '''
-    p[0] = p[-2]
+    # p[0] = p[-2]
 
-    # if len(p) == 2:
+
+    if len(p) == 4:
+        p[0] = {
+        'size' = p[3]['size']
+        }
+    else :
+        p[0] =
+        {
+        'size' = p[3]['size'] + p[5]['size']
+        }    
     if not ST.lookupIdentifier(p[1][1:]):
         lhs_place = ST.createTemp()
-        ST.insertIdentifier(p[1][1:],lhs_place,type_scope=p[-2],idType='scalar')
+        ST.insertIdentifier(p[1][1:],lhs_place,type_scope='my',idType=p[3]['type'])
         p[0] = {
             'place' : lhs_place,
-            'type' : 'scalar'
+            'type' : 'struct'
         }
     else:
         lhs_place = ST.getAttribute(p[1][1:],'place')
@@ -566,7 +584,7 @@ def p_hash_decl_struct(p):
             'place' : lhs_place,
             'type' : lhs_type
         }
-    
+
 
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
@@ -576,19 +594,23 @@ def p_type_of_var(p):
     '''
     if p[1] == '$':
         p[0] = {
-                'type':  'scalar'
+                'type':  'scalar',
+                'size': 4
             }
     elif p[1] == '@':
         p[0] = {
-                'type':  'array'
+                'type':  'array',
+                'size' : 400
             }
     elif p[1] == '%':
         p[0] = {
-                'type':  'hash'
+                'type':  'hash',
+                'size': 400
             }
     else :
         p[0] = {
                 'type':  'struct'
+                'size':  ST.getAttribute(p[1][1:],'size')   
             }         
 
 

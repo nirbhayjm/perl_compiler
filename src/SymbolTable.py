@@ -32,15 +32,25 @@ class SymbolTable:
         self.subCount += 1
         return self.subPrefix + str(self.subCount)
 
-    def insertIdentifier(self,idName,place,type_scope='main',idType='NoType'):
+    def insertIdentifier(self,idName,place,type_scope='main',idType='NoType', size = 4):
         if type_scope == 'my':
             setScope = self.currentScope
         else:
             setScope = 'main'
 
+        if idType == 'scalar':
+            size = 4
+        elif idType == 'array':
+            size = 400
+        elif idType == 'hash' :
+            size = 400
+        elif idType == 'struct' :
+            size = size            
+            
         self.table[setScope]['identifiers'][idName] = {
             'place' : place,
-            'type' : idType
+            'type' : idType,
+            'size' : size
         }
         self.table[setScope]['places'][place] = idName
 
