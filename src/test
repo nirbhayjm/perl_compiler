@@ -1,4 +1,7 @@
-#@a = (0,5,20);
+struct Breed =>
+{
+	name => $,
+	cross => $
+};
 
-%a = ( 1 => 2, 3=>99 );
-%b = ( 777,5,555,3 );
+$cat = Breed->new(name => 1, cross => 10);
