@@ -552,8 +552,6 @@ def p_struct_decl(p):
         'size' = p[5]['size']
         }    
 
-
-   
 def p_hash_decl_struct(p):
     '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
                             | SUBROUTINE_ID KEY_VALUE type_of_var
@@ -586,7 +584,6 @@ def p_hash_decl_struct(p):
             'type' : lhs_type
         }
 
-
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
                             | AT
@@ -614,6 +611,10 @@ def p_type_of_var(p):
                 'size':  ST.getAttribute(p[1][1:],'size')   
             }         
 
+def p_primary_exp_struct(p):
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN hash_decl CLOSE_PAREN
+    '''
+    
 
 #==============================================================================
 # 'print' function implementation
@@ -1050,11 +1051,6 @@ def p_primary_exp_misc(p):
     if len(p) == 2:
         p[0] = p[1]
     # print p[0]
-
-def p_primary_exp_struct(p):
-    '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN hash_decl CLOSE_PAREN
-     '''
-
 
 #--- added open_paren and close_paren around each of the expr, like in push expr, added a rule push (expr), 
 def p_array_op_exp(p):
