@@ -761,6 +761,7 @@ def p_assignment_exp_scalar(p):
         lhs_place = p[1]['place']
         assignee_place = p[1]['place']
     #--- Do not change this^
+    temp            = ST.createTemp()
     src_place       = p[3]['place']
 
     if p[4] != None: #--- Post-selection
@@ -776,7 +777,7 @@ def p_assignment_exp_scalar(p):
         TAC[ST.currentScope].emit(p[2][0],assignee_place,assignee_place,src_place)
     else:
         if 'deref' in p[3]:
-            TAC[ST.currentScope].emit('=*',rhs_temp,src_place,'')
+            TAC[ST.currentScope].emit('=*',temp,src_place,'')
             TAC[ST.currentScope].emit('=',src_place,temp,'')
 
         TAC[ST.currentScope].emit('=',assignee_place,src_place,'')
