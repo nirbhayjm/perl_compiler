@@ -569,10 +569,23 @@ def p_hash_decl_struct(p):
 
 #--- Hash declaration list for calling new instance of class
 def p_struct_arg_hash(p):
-    '''struct_arg_hash      : struct_arg_hash COMMA SUBROUTINE_ID KEY_VALUE SUBROUTINE_ID 
-                            |                       SUBROUTINE_ID KEY_VALUE SUBROUTINE_ID
+    '''struct_arg_hash      : struct_arg_hash COMMA SUBROUTINE_ID KEY_VALUE arith_relat_exp 
+                            |                       SUBROUTINE_ID KEY_VALUE arith_relat_exp
     '''
+    if len(p) == 4:
+        idName  = p[1]
+        src     = p[3]['place']
+    else:
+        idName  = p[3]
+        src     = p[5]['place']
     
+    thisPtr   = p[-1]['place']
+    className = p[-1]['type']
+    offset    = ST.getIdOffset(idName,className)
+    varPtr    = ST.createTemp()
+
+    TAC[ST.currentScope].emit( '+',varPtr,thisPtr,offset,'' )
+    TAC[ST.currentScope].emit( '*=',varPtr,src,'' )
 
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
@@ -607,17 +620,17 @@ def p_primary_exp_struct(p):
     p[0] = p[5]
 
 def p_M_structAlloc(p):
-    '''M_structAlloc: '''
+    '''M_structAlloc :'''
     thisPtr = ST.createTemp()
     classSize = ST.getClassSize(p[-4])
 
     p[0] = {
         'place' : thisPtr,
-        'type' : p[-4],
-        'size' : classSize
+        'type'  : p[-4],
+        'size'  : classSize
     }
 
-    TAC.emit( 'new',classSize,thisPtr )
+    TAC[ST.currentScope].emit( 'new',classSize,thisPtr,'' )
 
 #==============================================================================
 # 'print' function implementation

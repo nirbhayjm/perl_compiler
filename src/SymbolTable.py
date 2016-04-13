@@ -58,7 +58,7 @@ class SymbolTable:
             self.table[className]['class_size'] += size
             self.table[className]['places'][idName] = idName
             if 'i' in self.DEBUG:
-                print "ST: Inserted in class:",className," identifier :",idName,"-->",place
+                print "ST: Inserted identifier :",idName,"-->",className
 
         else: 
             if type_scope == 'my': # Local variable
@@ -148,6 +148,11 @@ class SymbolTable:
     def lookupCurrentClass(self):
         assert(self.currentlyInClass)
         return self.currentScope
+
+    def getIdOffset(self,idName,className):
+        assert(className in self.classes)
+        assert(idName in self.table[className]['identifiers'])
+        return self.table[className]['identifiers'][idName]['offset']
 
     def lookupScope(self,idName):
         scope = self.currentScope
