@@ -563,8 +563,13 @@ def p_hash_decl_struct(p):
     if len(p) == 4:
         if p[1] != 'sub':
             p[0] = { 'size' : p[3]['size'] }
+        else :
+            p[0] = { 'size' : 0 }    
     elif len(p) == 6 :
-        p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+        if p[1] != 'sub':
+            p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+    else :
+        p[0] = { 'size' : 0 }    
 
     if p[1] == 'sub' :
         TAC[ST.currentScope].emit('ret','','','')
@@ -586,7 +591,20 @@ def p_struct_arg_hash(p):
     '''struct_arg_hash      : struct_arg_hash COMMA SUBROUTINE_ID KEY_VALUE arith_relat_exp 
                             |                       SUBROUTINE_ID KEY_VALUE arith_relat_exp
     '''
+    if len(p) == 4:
+        idName  = p[1]
+        src     = p[3]['place']
+    else:
+        idName  = p[3]
+        src     = p[5]['place']
     
+    thisPtr   = p[-1]['place']
+    className = p[-1]['type']
+    offset    = ST.getIdOffset(idName,className)
+    varPtr    = ST.createTemp()
+
+    TAC[ST.currentScope].emit( '+',varPtr,thisPtr,offset,'' )
+    TAC[ST.currentScope].emit( '*=',varPtr,src,'' )
 
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
@@ -629,26 +647,38 @@ def p_primary_exp_subroutine_struct(p):
         'place': lhs_place,
         'type': 'func'
     }
-    TAC[ST.currentScope].emit('param',p[1]['place'] ,'','')
+
+    assert (ST.lookupIdentifier(p[1][1:]))
+    lhs_place = ST.getAttribute(p[1][1:],'place')
+    lhs_type = ST.getAttribute(p[1][1:],'type')
+        
+    TAC[ST.currentScope].emit('param', lhs_place ,'','')
     if p[5] is not None:
         for param in p[5]['place']:
             TAC[ST.currentScope].emit('param',param,'','')
-    TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],''
+    flag =0
+    print ST.lookupSub(p[3])        
+    for c in p[3] :
+        if c == '/':
+            flag =1
+        if flag == 1:
+            sub.append(c)    
+
+    TAC[ST.currentScope].emit('call',ST.lookupSub(p[3]),p[0]['place'],'')
 
 
 def p_M_structAlloc(p):
-    '''M_structAlloc : '''
+    '''M_structAlloc  : '''
     thisPtr = ST.createTemp()
     classSize = ST.getClassSize(p[-4])
 
     p[0] = {
         'place' : thisPtr,
-        'type' : p[-4],
-        'size' : classSize
+        'type'  : p[-4],
+        'size'  : classSize
     }
 
-    TAC.emit('new',classSize,thisPtr,'' )
-
+    TAC[ST.currentScope].emit( 'new',classSize,thisPtr,'' )
 
 #==============================================================================
 # 'print' function implementation
@@ -716,14 +746,17 @@ def p_decl_var(p):
             ST.insertIdentifier(p[1][1:],lhs_place,type_scope=p[-2],idType='scalar')
             p[0] = {
                 'place' : lhs_place,
-                'type' : 'scalar'
+                'type' : 'scalar',
+                'size'  : 4
             }
         else:
             lhs_place = ST.getAttribute(p[1][1:],'place')
             lhs_type = ST.getAttribute(p[1][1:],'type')
+            lhs_type = ST.getAttribute(p[1][1:],'size')
             p[0] = {
                 'place' : lhs_place,
-                'type' : lhs_type
+                'type' : lhs_type,
+                'size' : lhs_size
             }
 
 # array_indexer ASSIGN SUBROUTINE_ID SUBROUTINE_ID OPEN_PAREN array_decl_list CLOSE_PAREN added to support objects
@@ -874,6 +907,7 @@ def p_arith_relat_exp(p):
         p[0] = {
             'place': lhs_place,
             'type':'NoType'
+
         }
 
         if p[2] == '+':
@@ -1063,7 +1097,8 @@ def p_primary_exp_subroutine_call(p):
     lhs_place = ST.createTemp()
     p[0] = {
         'place': lhs_place,
-        'type': 'func'
+        'type': 'func',
+        'size': 4
     }
     if p[3] is not None:
         for param in p[3]['place']:
