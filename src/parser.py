@@ -840,9 +840,12 @@ def p_assignment_exp_scalar(p):
     else:
         TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],p[3]['place'])
 
-    if p[1]['type'] != p[3]['type']:
-        for attr in p[3]:
-            ST.addAttribute(p[1]['place'],attr,p[3][attr])
+    try:    
+        if p[1]['type'] != p[3]['type']:
+            for attr in p[3]:
+                ST.addAttribute(p[1]['place'],attr,p[3][attr])
+    except:
+        pass
 
     p[0] = p[1]
 
@@ -1218,7 +1221,9 @@ def p_array_decl_list(p):
     if len(p) == 2:
         p[0] = { 'place' : [p[1]['place']] }
     elif len(p) == 4:
-        p[0]['place'] += p[3]['place']
+        # print p[3]['p']
+        p[0] = {}
+        p[0]['place'] = [ p[1]['place'] ] + p[3]['place']
 
 def p_string_list(p):
     '''string_list          : SUBROUTINE_ID string_list
