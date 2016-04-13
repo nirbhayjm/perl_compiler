@@ -361,7 +361,7 @@ def p_M_caseBegin(p):
     ''' M_caseBegin :'''
     p[0] = p[-5]
     TAC[ST.currentScope].addPatchList(p[-5]['labels']['caseNextStmtLabel'])
-    TAC[ST.currentScope].emit('ifgoto','neq',p[-2]['place'], p[-5]['place'] , p[-5]['labels']['caseNextStmtLabel'] )
+    TAC[ST.currentScope].emit('ifgoto','ne',p[-2]['place'], p[-5]['place'] , p[-5]['labels']['caseNextStmtLabel'] )
 
 def p_M_defaultCase(p):
     ''' M_defaultCase :'''
@@ -759,13 +759,24 @@ def p_print_list(p):
     '''print_list       : print_list print_sep arith_relat_exp
                         | arith_relat_exp
     '''
+    print_place = ST.createTemp()
     if len(p) == 2:
-        p[0] = p[1]
-        TAC[ST.currentScope].emit('print',p[1]['place'],'','')
+        aInd = 1
     else:
-        p[0] = p[3]
-    #TODO: Insert a blank space between prints list items
-        TAC[ST.currentScope].emit('print',p[3]['place'],'','')
+        aInd = 2
+
+    if 'deref' in p[aInd]:
+        TAC[ST.currentScope].emit('=*',print_place,p[aInd]['place'],'')
+    else:
+        print_place = p[aInd]['place']
+
+    # if len(p) == 2:
+    p[0] = p[aInd]
+    TAC[ST.currentScope].emit('print',print_place,'','')
+    # else:
+    #     p[0] = p[3]
+    # #TODO: Insert a blank space between prints list items
+    #     TAC[ST.currentScope].emit('print',p[3]['place'],'','')
 
 def p_print_sep(p):
     '''print_sep        : COMMA

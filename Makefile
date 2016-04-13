@@ -3,7 +3,7 @@
 all: out.s
 
 out.ir:
-	./src/parser.py test/switch.pl >out.ir
+	./src/parser.py test/struct.pl >out.ir
 
 out.s:	out.ir
 	./src/asgen.py out.ir >out.s

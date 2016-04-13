@@ -131,7 +131,7 @@ class AssCodeGen:
         print ".section .data"
         print
         print "output_string: .asciz \"%d\\n\""
-        print
+        print "print_string: .asciz \"%s\\n\""
         print "input_string: .asciz \"%d\""
         print
         print "scan: .asciz \"Enter Value: \""
@@ -318,8 +318,11 @@ class AssCodeGen:
                     try:
                         reg = self.add_desc[instr[2][instr[2].index('[')+1:-1]]
                     except KeyError:
-                        reg = self.getregforced(instr[2][instr[2].index('[')+1:-1],instr)
-                        print "    movl $" + instr[2][instr[2].index('[')+1:-1] + ", " + reg
+                        if instr[2][instr[2].index('[')+1:-1] in self.variable_list:
+                            reg = self.getregforced(instr[2][instr[2].index('[')+1:-1],instr)
+                            print "    movl " + instr[2][instr[2].index('[')+1:-1] + ", " + reg
+                        else:
+                            print "    movl $" + instr[2][instr[2].index('[')+1:-1] + ", " + reg
                         self.reg[reg] = 0
                     if instr[3] in self.variable_list:
                         try:
@@ -408,16 +411,15 @@ class AssCodeGen:
                     except KeyError:
                         dest = self.getreg(instr[2])
                 else:
-                    # try:
-                    #     dest,flag = self.add_desc[instr[2]],0
-                    # except KeyError:
-                    #     dest,flag = self.getregx(instr[0],instr[2],instr[3])
-                    #     if flag == 1:                           # This is the case when y has no further use, so spilling it and assigning register of y to x
-                    #         reg = self.add_desc[instr[3]]
-                    #         self.spillreg(reg)
-                    #         self.add_desc[instr[2]] = reg
-                    #         self.reg[self.add_desc[instr[2]]] = instr[2]
-                    dest = self.getregforced(instr[2],instr)
+                    try:
+                        dest,flag = self.add_desc[instr[2]],0
+                    except KeyError:
+                        dest,flag = self.getregx(instr[0],instr[2],instr[3])
+                        if flag == 1:                           # This is the case when y has no further use, so spilling it and assigning register of y to x
+                            reg = self.add_desc[instr[3]]
+                            self.spillreg(reg)
+                            self.add_desc[instr[2]] = reg
+                            self.reg[self.add_desc[instr[2]]] = instr[2]
 
                     if instr[3] not in self.variable_list:          # Checking if y is a variable or a constant
                         print "    movl $" + instr[3] + ", " + dest
@@ -877,7 +879,7 @@ class AssCodeGen:
                             print "    movl " + self.add_desc[instr[2]] + ", " + "%eax"
                             self.add_desc[instr[2]] = '%eax'
                             self.reg['%eax'] = instr[2]
-                        print "    movl " + instr[2] + ", " + "%eax"
+                        #print "    movl " + instr[2] + ", " + "%eax"
                     else:
                         print "    movl " + "$" + instr[2] + ", " + "%eax"
                 print "    ret"
