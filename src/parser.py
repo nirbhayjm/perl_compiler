@@ -558,7 +558,7 @@ def p_hash_decl_struct(p):
     '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE   type_of_var COMMA hash_decl_struct
                             | SUBROUTINE_ID KEY_VALUE   type_of_var
                             | SUB SUBROUTINE_ID M_class_sub compound_stmt M_class_end COMMA hash_decl_struct
-                            | SUB SUBROUTINE_ID M_class_sub compound_stmt
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt M_class_end
     '''
     if len(p) == 4:
         if p[1] != 'sub':
@@ -568,15 +568,17 @@ def p_hash_decl_struct(p):
     elif len(p) == 6 :
         if p[1] != 'sub':
             p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+        else :
+            p[0] = { 'size' : 0 }  
     else :
-        p[0] = { 'size' : 0 }    
+        p[0] = { 'size' : 0 }           
     # print ST.currentScope    
-    if p[1] == 'sub':
-        if len(p) != 5 :
-            print ST.currentScope
-            TAC[ST.currentScope].emit('ret','','','')
-            ST.endDeclareSub()    
-    else:        
+    # if p[1] == 'sub':
+    #     if len(p) != 5 :
+    #         print ST.currentScope
+    #         TAC[ST.currentScope].emit('ret','','','')
+    #         ST.endDeclareSub()    
+    if p[1] != 'sub' :        
         ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
 
 def p_M_class_sub(p):
@@ -585,7 +587,7 @@ def p_M_class_sub(p):
     
 
     ST.declareSub(p[-1])
-    print ST.currentScope
+    # print ST.currentScope
     TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
     TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
 
