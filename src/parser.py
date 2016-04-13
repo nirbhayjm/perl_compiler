@@ -294,10 +294,7 @@ def p_post_selection(p):
 #==============================================================================
 
 def p_switch_stmt(p):
-
-
     '''switch_stmt      : SWITCH OPEN_PAREN exp_stmt CLOSE_PAREN M_switchBegin OPEN_BRACE switch_block CLOSE_BRACE
-
     '''
     TAC[ST.currentScope].placeLabel(p[5]['labels']['SwitchStmtEnd'])
 
@@ -572,7 +569,7 @@ def p_hash_decl_struct(p):
     # print ST.currentScope    
     if p[1] == 'sub':
         if len(p) != 5 :
-            print ST.currentScope
+            # print ST.currentScope
             TAC[ST.currentScope].emit('ret','','','')
             ST.endDeclareSub()    
     else:        
@@ -583,7 +580,8 @@ def p_M_class_sub(p):
     #TODO: Check if method is already declared in current scope    
 
     ST.declareSub(p[-1])
-    print ST.currentScope
+    # print ST.currentScope
+
     TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
     TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
 
@@ -1141,8 +1139,8 @@ def p_postfix_exp(p):
     # print p[0]
     if len(p) == 3:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
         # print "NO"
+        print p[1]['place']
         lhs_place = ST.createTemp()
-        p[0]['place'] = lhs_place
         # p[0] = {
         #     'place' : lhs_place,
         #     'type' : p[1]['type']
@@ -1150,6 +1148,7 @@ def p_postfix_exp(p):
         #--- NOTE: POST Increment i.e. primary_exp is incremented after assignment to lhs_place
         TAC[ST.currentScope].emit('=',lhs_place,p[1]['place'],'')
         TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],'1')
+        p[0]['place'] = lhs_place
 
 #--- SUBROUTING_ID --> Function return value
 #--- SLASH BIT_AND SUB... --> Address of function
@@ -1235,10 +1234,10 @@ def p_array_decl_list(p):
     '''
     # print p[1]
     if len(p) == 2:
-        print "p0:",p[1]['place']
+        # print "p0:",p[1]['place']
         p[0] = { 'place' : [p[1]['place']] }
     elif len(p) == 4:
-        print "p3:",p[3]
+        # print "p3:",p[3]
         p[0] = {}
         p[0]['place'] = [p[1]['place']] + p[3]['place']
 
@@ -1453,7 +1452,7 @@ precedence = (
 # End of Perl grammar
 #==============================================================================
 
-ST = SymbolTable.SymbolTable(debug='i')
+ST = SymbolTable.SymbolTable(debug='')
 TAC = {}
 TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
 parser = yacc.yacc()

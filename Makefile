@@ -1,12 +1,12 @@
 .PHONY: all clean
 
-all: out.s 
+all: out.s
 
-int.ir:
-	./src/parser.py test/test1.pl
+out.ir:
+	./src/parser.py test/switch.pl >out.ir
 
-out.s:	int.ir
-	./src/asgen.py int.ir >out.s
+out.s:	out.ir
+	./src/asgen.py out.ir >out.s
 
 bin/out: out.s
 	as --gstabs out.s -32 -o bin/out.o
@@ -16,4 +16,4 @@ out: bin/out
 	./bin/out
 
 clean:
-	rm  -rf src/*.pyc src/parsetab.py src/parser.out bin/irgen out.s bin/out.o
+	rm  -rf src/*.pyc src/parsetab.py src/parser.out bin/irgen out.s bin/out.o out.ir

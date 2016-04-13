@@ -347,10 +347,11 @@ class AssCodeGen:
                     try:
                         reg = self.add_desc[instr[3][instr[3].index('[')+1:-1]]
                     except KeyError:
-                        #if instr[3][instr[3].index('[')+1:-1] in self.variable_list:
-                        reg = self.getregforced(instr[3][instr[3].index('[')+1:-1],instr)
-                        #else
-                    print "    movl $" + instr[3][instr[3].index('[')+1:-1] + ", " + reg
+                        if instr[3][instr[3].index('[')+1:-1] in self.variable_list:
+                            reg = self.getregforced(instr[3][instr[3].index('[')+1:-1],instr)
+                            print "    movl " + instr[3][instr[3].index('[')+1:-1] + ", " + reg
+                        else:
+                            print "    movl $" + instr[3][instr[3].index('[')+1:-1] + ", " + reg
                     print "    movl (%s,%s,4), %s"%(self.add_desc[instr[3][:instr[3].index('[')]],reg,instr[2])
                     self.reg[reg] = 0
                     del self.add_desc[instr[3][instr[3].index('[')+1:-1]]
