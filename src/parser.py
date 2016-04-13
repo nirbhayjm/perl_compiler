@@ -545,46 +545,46 @@ def p_struct_decl(p):
 
     if len(p) == 9:
         p[0] = {
-        'size' = p[6]['size']
+        'size' : p[6]['size']
         }
     else :
         p[0] = {
-        'size' = p[5]['size']
+        'size' : p[5]['size']
         }    
 
 def p_hash_decl_struct(p):
     '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
                             | SUBROUTINE_ID KEY_VALUE type_of_var
-                            | SUB SUBROUTINE_ID compound_stmt
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt COMMA hash_decl_struct
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt
                         
     '''
     # p[0] = p[-2]
 
-
     if len(p) == 4:
         if p[1] != 'sub':
             p[0] = {
-            'size' = p[3]['size']
+            'size' : p[3]['size']
             }
     else :
-        p[0] =
-        {
-        'size' = p[3]['size'] + p[5]['size']
+        p[0] = {
+        'size' : p[3]['size'] + p[5]['size']
         }    
-    if not ST.lookupIdentifier(p[1][1:]):
-        lhs_place = ST.createTemp()
-        ST.insertIdentifier(p[1][1:],lhs_place,type_scope='my',idType=p[3]['type'])
-        p[0] = {
-            'place' : lhs_place,
-            'type' : 'struct'
-        }
-    else:
-        lhs_place = ST.getAttribute(p[1][1:],'place')
-        lhs_type = ST.getAttribute(p[1][1:],'type')
-        p[0] = {
-            'place' : lhs_place,
-            'type' : lhs_type
-        }
+
+    if p[1] == 'sub' :
+        TAC[ST.currentScope].emit('ret','','','')
+        ST.endDeclareSub()
+
+
+def p_M_class_sub(p):
+    '''M_class_sub : '''
+    #TODO: Check if method is already declared in current scope
+    
+
+    ST.declareSub(p[-1])
+    TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
+    TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
+
 
 def p_type_of_var(p):
     '''type_of_var          : DOLLAR
@@ -609,7 +609,7 @@ def p_type_of_var(p):
             }
     else :
         p[0] = {
-                'type':  'struct'
+                'type':  'struct',
                 'size':  ST.getAttribute(p[1][1:],'size')   
             }         
 
@@ -617,6 +617,13 @@ def p_primary_exp_struct(p):
     '''primary_exp          : SUBROUTINE_ID DEREFERENCE NEW OPEN_PAREN hash_decl CLOSE_PAREN
     '''
     
+def p_primary_exp_class_subroutine_call(p):
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
+                            | SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
+                            
+    '''
+    
+
 
 #==============================================================================
 # 'print' function implementation
@@ -1026,6 +1033,7 @@ def p_primary_exp_indexer(p):
 def p_primary_exp_subroutine_call(p):
     '''primary_exp          : SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
                             | SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
+
     '''
     lhs_place = ST.createTemp()
     p[0] = {
@@ -1036,6 +1044,9 @@ def p_primary_exp_subroutine_call(p):
         for param in p[3]['place']:
             TAC[ST.currentScope].emit('param',param,'','')
     TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],'')
+
+
+
 
 def p_primary_exp_misc(p):
     '''primary_exp          : QW DIVIDE string_list DIVIDE

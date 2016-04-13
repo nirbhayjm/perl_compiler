@@ -124,7 +124,7 @@ class SymbolTable:
         return self.table[self.currentScope]['type'] == 'class'
 
     def lookupClass(self,className):
-        return className in self.table['main']['classes']
+        return className in self.classes
 
     def lookupScope(self,idName):
         scope = self.currentScope
