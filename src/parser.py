@@ -294,10 +294,7 @@ def p_post_selection(p):
 #==============================================================================
 
 def p_switch_stmt(p):
-
-
     '''switch_stmt      : SWITCH OPEN_PAREN exp_stmt CLOSE_PAREN M_switchBegin OPEN_BRACE switch_block CLOSE_BRACE
-
     '''
     TAC[ST.currentScope].placeLabel(p[5]['labels']['SwitchStmtEnd'])
 
@@ -542,7 +539,6 @@ def p_struct_decl(p):
                             | STRUCT SUBROUTINE_ID M_classInit KEY_VALUE OPEN_SBRACKET hash_decl_struct CLOSE_SBRACKET 
                             | STRUCT SUBROUTINE_ID M_classInit KEY_VALUE OPEN_BRACE    hash_decl_struct CLOSE_BRACE 
     '''
-
     if len(p) == 10:
         p[0] = { 'size' : p[7]['size'] }
     else :
@@ -572,22 +568,17 @@ def p_hash_decl_struct(p):
             p[0] = { 'size' : 0 }  
     else :
         p[0] = { 'size' : 0 }           
-    # print ST.currentScope    
-    # if p[1] == 'sub':
-    #     if len(p) != 5 :
-    #         print ST.currentScope
-    #         TAC[ST.currentScope].emit('ret','','','')
-    #         ST.endDeclareSub()    
+    # print ST.currentScope       
     if p[1] != 'sub' :        
         ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
 
 def p_M_class_sub(p):
     '''M_class_sub : '''
-    #TODO: Check if method is already declared in current scope
-    
+    #TODO: Check if method is already declared in current scope    
 
     ST.declareSub(p[-1])
     # print ST.currentScope
+
     TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
     TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
 
@@ -688,7 +679,6 @@ def p_primary_exp_subroutine_struct(p):
 
     TAC[ST.currentScope].emit('call',label_name,p[0]['place'],'')
 
-
 def p_M_structAlloc(p):
 
     '''M_structAlloc :'''
@@ -735,6 +725,12 @@ def p_object_var_deref(p):
     else:
         print "Error! Type:",idType," is not the pointer of the correct object!"
         assert(False)
+
+def p_primary_exp_class_subroutine_call(p):
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
+                            | SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
+                            
+    '''
 
 #==============================================================================
 # 'print' function implementation
@@ -822,31 +818,48 @@ def p_assignment_exp_scalar(p):
     '''assignment_exp       : scalar_indexer  assignment_op     arith_relat_exp     post_selection
     '''
 
+    post_label = TAC[ST.currentScope].makeLabel()
+    lhs_place = None
+    assignee_place = None
+
+    if 'deref' in p[1]:
+        lhs_place       = p[1]['place']
+        assignee_place  = ST.createTemp()
+    else:
+        lhs_place = p[1]['place']
+        assignee_place = p[1]['place']
+    #--- Do not change this^
+    temp            = ST.createTemp()
+    src_place       = p[3]['place']
+
     if p[4] != None: #--- Post-selection
         # print p[4]
         if p[4]['cond'] == 'if':
-            TAC[ST.currentScope].emit('ifgoto','eq',p[4]['exp_place'],'0',TAC[ST.currentScope].getNextQuad()+2)
+            TAC[ST.currentScope].addPatchList(post_label)
+            TAC[ST.currentScope].emit('ifgoto','eq',p[4]['exp_place'],'0',post_label)
         elif p[4]['cond'] == 'unless':
-            TAC[ST.currentScope].emit('ifgoto','ne',p[4]['exp_place'],'0',TAC[ST.currentScope].getNextQuad()+2)
+            TAC[ST.currentScope].addPatchList(post_label)
+            TAC[ST.currentScope].emit('ifgoto','ne',p[4]['exp_place'],'0',post_label)
 
-    if p[2] == "=":
-        if 'deref' in p[1]:
-            print "OKAY1"
-            TAC[ST.currentScope].emit('*=',p[1]['place'],p[3]['place'],'')
-        elif 'deref' in p[3]:
-            print "OKAY2"
-            TAC[ST.currentScope].emit('=*',p[1]['place'],p[3]['place'],'')
-        TAC[ST.currentScope].emit('=',p[1]['place'],p[3]['place'],'')
+    if p[2] != "=":
+        TAC[ST.currentScope].emit(p[2][0],assignee_place,assignee_place,src_place)
     else:
-        TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],p[3]['place'])
+        if 'deref' in p[3]:
+            TAC[ST.currentScope].emit('=*',temp,src_place,'')
+            TAC[ST.currentScope].emit('=',src_place,temp,'')
+        TAC[ST.currentScope].emit('=',assignee_place,src_place,'')
+        
+        if 'deref' in p[1]:
+            TAC[ST.currentScope].emit('*=',lhs_place,assignee_place,'')
 
-    try:    
+    try:
         if p[1]['type'] != p[3]['type']:
             for attr in p[3]:
                 ST.addAttribute(p[1]['place'],attr,p[3][attr])
     except:
         pass
 
+    TAC[ST.currentScope].placeLabel(post_label)
     p[0] = p[1]
 
 def p_assignment_exp_array(p):
@@ -976,11 +989,8 @@ def p_arith_relat_exp(p):
             p[3]['place'] = temp
 
         lhs_place = ST.createTemp()
-        p[0] = {
-            'place': lhs_place,
-            'type':'NoType'
-
-        }
+        p[0] = p[1].copy()
+        p[0]['place'] = lhs_place
 
         if p[2] == '+':
             TAC[ST.currentScope].emit('+',lhs_place,p[1]['place'],p[3]['place'])
@@ -1122,9 +1132,11 @@ def p_postfix_exp(p):
                             | primary_exp AUTO_DEC
     '''
     p[0] = p[1]
+    # print p[0]
     if len(p) == 3:   #--- Emits '+' or '-' according to AUTO_INC or AUTO_DEC
+        # print "NO"
+        print p[1]['place']
         lhs_place = ST.createTemp()
-        p[0]['place'] = lhs_place
         # p[0] = {
         #     'place' : lhs_place,
         #     'type' : p[1]['type']
@@ -1132,6 +1144,7 @@ def p_postfix_exp(p):
         #--- NOTE: POST Increment i.e. primary_exp is incremented after assignment to lhs_place
         TAC[ST.currentScope].emit('=',lhs_place,p[1]['place'],'')
         TAC[ST.currentScope].emit(p[2][0],p[1]['place'],p[1]['place'],'1')
+        p[0]['place'] = lhs_place
 
 #--- SUBROUTING_ID --> Function return value
 #--- SLASH BIT_AND SUB... --> Address of function
@@ -1178,9 +1191,6 @@ def p_primary_exp_subroutine_call(p):
             TAC[ST.currentScope].emit('param',param,'','')
     TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],'')
 
-
-
-
 def p_primary_exp_misc(p):
     '''primary_exp          : QW DIVIDE string_list DIVIDE
                             | QW OPEN_PAREN string_list CLOSE_PAREN
@@ -1218,12 +1228,15 @@ def p_array_decl_list(p):
                             | arith_relat_exp COMMA array_decl_list
                             |
     '''
+    # print p[1]
     if len(p) == 2:
+        # print "p0:",p[1]['place']
         p[0] = { 'place' : [p[1]['place']] }
     elif len(p) == 4:
-        # print p[3]['p']
+        # print "p3:",p[3]
         p[0] = {}
-        p[0]['place'] = [ p[1]['place'] ] + p[3]['place']
+        p[0]['place'] = [p[1]['place']] + p[3]['place']
+
 
 def p_string_list(p):
     '''string_list          : SUBROUTINE_ID string_list
@@ -1436,7 +1449,7 @@ precedence = (
 # End of Perl grammar
 #==============================================================================
 
-ST = SymbolTable.SymbolTable(debug='i')
+ST = SymbolTable.SymbolTable(debug='')
 TAC = {}
 TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
 parser = yacc.yacc()

@@ -1,8 +1,13 @@
 struct Breed =>
 {
 	name => $,
+	arrat => @,
 	cross => $
 };
 
 $cat = Breed->new(name => 1, cross => 10);
+$b = 0;
 $cat->name = 2;
+$b = $cat->cross;
+
+print $b;

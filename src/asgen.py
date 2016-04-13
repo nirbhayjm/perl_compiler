@@ -11,7 +11,7 @@ class AssCodeGen:
             '%ecx': 0,
             '%edx': 0,
             '%esi': 0,
-            '%edi': 0
+            '%edi': 0,
         }
         self.bitops = {
             '&' : "andl",
@@ -29,6 +29,7 @@ class AssCodeGen:
         self.instr_set = self.read_tac(self.tac_file)
         self.variable_list,self.variable_dict = self.extract_variables(self.instr_set)
         self.function_list = self.extract_functions(self.instr_set)
+        self.params = 0
         self.setup_data_region()
         self.basic_blocks = self.make_basic_blocks(self.instr_set)
         self.next_use = self.evaluate_next_uses(self.basic_blocks)
@@ -43,23 +44,39 @@ class AssCodeGen:
         variables = []
         variable_dict = {}
         for instr in instr_set:
-            if instr[1] in ['=','+','-','*','/','%','=&','*=','=*','scan'] + self.bitops.keys() + self.shiftop.keys():
+            if instr[1] in ['=','+','-','*','/','%','=&','*=','=*'] + self.bitops.keys() + self.shiftop.keys():
                 if '[' in instr[2]:
                     variable_dict[instr[2]] = 'array'
                     variable_dict[instr[2][:instr[2].index('[')]] = 'array'
                     variables.append(instr[2][:instr[2].index('[')])
+                elif '{' in instr[2]:
+                    variable_dict[instr[2]] = 'hash'
+                    variable_dict[instr[2][:instr[2].index('{')]] = 'hash'
+                    variables.append(instr[2][:instr[2].index('{')])
                 elif instr[3].isdigit():
                     variable_dict[instr[2]] = 'int'
                     variables.append(instr[2])
                 elif instr[3][0] in ['"',"'"]:
-                    variable_dict[instr[2]] = 'string'
+                    variable_dict[instr[2]] = instr[3]
                     variables.append(instr[2])
                 elif '.' in instr[3]:
                     variable_dict[instr[2]] = 'float'
                     variables.append(instr[2])
+                # elif instr[3] in variable_dict.keys():
+                #     if variable_dict[instr[3]] == 'pointer':
+                #         variable_dict[instr[2]] = 'pointer'
+                #         self.pointers[instr[2]] = 0
+                #         print instr[2]
                 else:
                     variable_dict[instr[2]] = 'int'
                     variables.append(instr[2])
+            elif instr[1] in ['scan']:
+            	variable_dict[instr[2]] = 'int'
+            	variables.append(instr[2])
+            elif instr[1] == 'new':
+                variable_dict[instr[3]] = 'pointer'
+                variables.append(instr[3])
+                self.pointers[instr[3]] = instr[2]
             elif instr[1] == 'call':
                 try:
                     variables.append(instr[3])
@@ -70,6 +87,8 @@ class AssCodeGen:
                 self.pointers[instr[2]] = instr[3]
             if instr[1] == '=' and instr[3] in self.pointers.keys():
                 self.pointers[instr[2]] = self.pointers[instr[3]]       # Storing where does a particular pointer point
+        variables.append('param')
+        variable_dict['param'] = 'array'
         variables = list(set(variables))
         return variables,variable_dict
 
@@ -118,15 +137,16 @@ class AssCodeGen:
         print "scan: .asciz \"Enter Value: \""
         print
         for variable in self.variable_list:
-	            # print self.variable_list
-	            # while True:
-	            #     pass
-            if self.variable_dict[variable] == 'array':
+            if self.variable_dict[variable] not in ['int','array','hash','pointer']:
+                print variable + ":    .asciz " + self.variable_dict[variable]
+            elif self.variable_dict[variable] == 'array':
                 if '[' in variable:
                     print variable[:variable.index('[')] + ":",
                 else:
                     print variable + ":",
-                print "   .space 100"
+                print "   .space 400"
+            # elif self.variable_dict[variable] == 'pointer':
+            #     print "%s    .space %s"%(variable,self.pointers[variable])
             else:
                 print variable + ":",
                 print "   .int 0"
@@ -158,7 +178,6 @@ class AssCodeGen:
                 self.reg[reg] = x
                 return reg,2                        #  Flag=2 if an empty register is found
             if self.next_use[lineno+1][x] != 0:         
-                #print "Here3"
                 var = min(self.next_use[lineno], key = self.next_use[lineno].get)       # Pick register of a variable which is not live in current basic block
                 if self.next_use[lineno][var] != 0 or var not in self.reg.values():     # If no such register, then pick the one with highest next use
                     sorted_last_use = sorted(self.next_use[lineno], key=self.next_use[lineno].get)
@@ -184,7 +203,7 @@ class AssCodeGen:
             return reg                          # Returning an empty register if found
         return y                                # Otherwise returning the memory location
 
-    def getregforced(self,y):
+    def getregforced(self,y,instr):
         for reg,taken in self.reg.items():                  # In the index of array cannot be a constant, hence a register has to be assigned to it
             if taken == 0:   # Returning an empty register
                 break
@@ -196,6 +215,7 @@ class AssCodeGen:
             reg = self.add_desc[furthest_use]
             self.spillreg(reg)
         self.add_desc[y] = reg
+        self.reg[reg] = y
         return reg
 
     def make_basic_blocks(self,instr_set):      # Function for separating basic blocks from the instruction set
@@ -246,25 +266,21 @@ class AssCodeGen:
             if block[0][0] in self.leaders:
                 label = max(self.label.values()) + 1
                 self.label[block[0][0]] = label
-        # for block in self.basic_blocks:
-        #     print block
-        # while True:
-        #     pass
         for block in self.basic_blocks:         # First printng basic blocks of all functions except main
             if block[0][1] == 'label':
-                # print block
-                # while True:
-                #     pass
-                for fblock in self.basic_blocks[self.basic_blocks.index(block):]:
+                for i,fblock in enumerate(self.basic_blocks[self.basic_blocks.index(block):]):
                     self.emit_block_code(fblock)
-                    if fblock[-1][1] == 'ret':
+                    if fblock[-1][1] == 'ret' and i+1 < len(self.basic_blocks[self.basic_blocks.index(block):]) and self.basic_blocks[self.basic_blocks.index(block):][i+1][0][1] != 'ret': 
                         break
-                continue
-        # for block in self.basic_blocks:              
-        #     if block in self.function_blocks:
-        #         self.emit_block_code(block)
-        #         continue            
+                continue         
         print "_start:"
+        # while True:
+        #     pass
+        for var,types in self.variable_dict.iteritems():
+            if types == 'hash' and '{' not in var:
+                print "    call createHash"
+                print "    movl %eax, " + var
+
         for block in self.basic_blocks:
             if block[0][1] == 'label' or block in self.function_blocks: 
                 continue
@@ -280,7 +296,7 @@ class AssCodeGen:
                 print
                 print "L" + str(self.label[block[0][0]]) + ":"
 
-        for reg in self.reg.keys():             
+        for reg in self.reg.keys():
             self.reg[reg] = 0
         self.add_desc = {}
 
@@ -290,47 +306,55 @@ class AssCodeGen:
                 print "    movl $0, %ebx"
                 print "    int $0x80"
             elif instr[1] == '=' and instr[2] != instr[3]:
-                # if instr[2] == 't7':
-                #     print instr[3],self.variable_dict
-                if self.variable_dict[instr[2]] == 'array':
+
+                if self.variable_dict[instr[2]] not in ['int','hash','array','pointer']:
+                    pass
+                elif '[' in instr[2]:
                     if instr[2][:instr[2].index('[')] not in self.add_desc.keys():
-                        reg = self.getregforced(instr[2][:instr[2].index('[')])
+                        reg = self.getregforced(instr[2][:instr[2].index('[')],instr)
                         print "    movl $" + instr[2][:instr[2].index('[')] + ", " + reg
                         self.reg[reg] = instr[2][:instr[2].index('[')]
                         self.add_desc[instr[2][:instr[2].index('[')]] = reg
                     try:
                         reg = self.add_desc[instr[2][instr[2].index('[')+1:-1]]
                     except KeyError:
-                        reg = self.getregforced(instr[2][instr[2].index('[')+1:-1])
+                        reg = self.getregforced(instr[2][instr[2].index('[')+1:-1],instr)
                         print "    movl $" + instr[2][instr[2].index('[')+1:-1] + ", " + reg
                         self.reg[reg] = 0
                     if instr[3] in self.variable_list:
                         try:
                             instr[3] = self.add_desc[instr[3]]
                         except KeyError:
-                            instr[3] = self.getregforced(instr[3])
+                            instr[3] = self.getregforced(instr[3],instr)
                     else:
                     	instr[3] = '$' + instr[3]
                     print "    movl %s, (%s,%s,4) " % (instr[3],self.add_desc[instr[2][:instr[2].index('[')]],reg)
 
-                #elif instr[3] in self.variable_dict and self.variable_dict[instr[3]] == 'array':
                 elif '[' in instr[3]:
                     if instr[2] in self.variable_list:
                     	try:
                     		instr[2] = self.add_desc[instr[2]]
                     	except KeyError:
-                            instr[2] = self.getregforced(instr[2])
+                            instr[2] = self.getregforced(instr[2],instr)
                     else:
                     	instr[2] = '$' + instr[2]
-                    if instr[3][:instr[3].index('[')] not in self.add_desc.keys():
-                        self.getregforced(instr[3][:instr[3].index('[')])
+                    #print 'a',self.add_desc,self.reg
+                    if 'param' in instr[3]:
+                        self.add_desc['param'] = '%ebp'
+                    else:
+	                    if instr[3][:instr[3].index('[')] not in self.add_desc.keys():
+	                        self.getregforced(instr[3][:instr[3].index('[')],instr)
                     try:
                         reg = self.add_desc[instr[3][instr[3].index('[')+1:-1]]
                     except KeyError:
                         if instr[3][instr[3].index('[')+1:-1] in self.variable_list:
-                            reg = self.getregforced(instr[3][instr[3].index('[')+1:-1])
-                        print "    movl $" + instr[3][instr[3].index('[')+1:-1] + ", " + reg
+                            reg = self.getregforced(instr[3][instr[3].index('[')+1:-1],instr)
+                            print "    movl " + instr[3][instr[3].index('[')+1:-1] + ", " + reg
+                        else:
+                            print "    movl $" + instr[3][instr[3].index('[')+1:-1] + ", " + reg
                     print "    movl (%s,%s,4), %s"%(self.add_desc[instr[3][:instr[3].index('[')]],reg,instr[2])
+                    self.reg[reg] = 0
+                    del self.add_desc[instr[3][instr[3].index('[')+1:-1]]
                     
                 else:
                     try:
@@ -339,10 +363,13 @@ class AssCodeGen:
                         dest,flag = self.getregx(instr[0],instr[2],instr[3])
                         if flag == 1:
                             reg = self.add_desc[instr[3]]
+                            #print reg,self.reg[reg]
                             self.spillreg(reg)              # Spilling out variable y since it has no next use if flag=1
                             self.add_desc[instr[2]] = reg
                             self.reg[self.add_desc[instr[2]]] = instr[2]
+                            #print self.reg,self.add_desc,'d'
                             continue
+                    #print flag,'c'
                     if instr[3] in self.variable_list:       # Else in all cases move y into register of x
                         if instr[3] in self.add_desc.keys():
                             print "    movl " + self.add_desc[instr[3]] + ", " + dest
@@ -381,15 +408,16 @@ class AssCodeGen:
                     except KeyError:
                         dest = self.getreg(instr[2])
                 else:
-                    try:
-                        dest,flag = self.add_desc[instr[2]],0
-                    except KeyError:
-                        dest,flag = self.getregx(instr[0],instr[2],instr[3])
-                        if flag == 1:                           # This is the case when y has no further use, so spilling it and assigning register of y to x
-                            reg = self.add_desc[instr[3]]
-                            self.spillreg(reg)
-                            self.add_desc[instr[2]] = reg
-                            self.reg[self.add_desc[instr[2]]] = instr[2]
+                    # try:
+                    #     dest,flag = self.add_desc[instr[2]],0
+                    # except KeyError:
+                    #     dest,flag = self.getregx(instr[0],instr[2],instr[3])
+                    #     if flag == 1:                           # This is the case when y has no further use, so spilling it and assigning register of y to x
+                    #         reg = self.add_desc[instr[3]]
+                    #         self.spillreg(reg)
+                    #         self.add_desc[instr[2]] = reg
+                    #         self.reg[self.add_desc[instr[2]]] = instr[2]
+                    dest = self.getregforced(instr[2],instr)
 
                     if instr[3] not in self.variable_list:          # Checking if y is a variable or a constant
                         print "    movl $" + instr[3] + ", " + dest
@@ -649,29 +677,56 @@ class AssCodeGen:
                     print "    movl $" + instr[3] + ", " + self.getreg(instr[2])
 
             elif instr[1] == '*=':               # *a=b, storing value of b in memory location where a is pointing
-                if self.pointers[instr[2]] in self.add_desc.keys():
-                    reg = self.add_desc[self.pointers[instr[2]]]
-                    self.spillreg(reg)
-
-                if instr[3] in self.add_desc.keys():
-                    print "    movl " + self.add_desc[instr[3]] + ", " + self.pointers[instr[2]]
+                # if self.pointers[instr[2]] in self.add_desc.keys():
+                #     reg = self.add_desc[self.pointers[instr[2]]]
+                #     self.spillreg(reg)
+                if instr[2] in self.add_desc.keys():
+                    reg = self.add_desc[instr[2]]
                 else:
-                    print "    movl " + self.getreg(instr[3]) + ", " + self.pointers[instr[2]]
+                    reg = self.getregforced(instr[2],instr)
+                    print "    movl " + instr[2] + ", " + reg
+                if instr[3] in self.add_desc.keys():
+                    print "    movl " + self.add_desc[instr[3]] + ", (" + reg + ")"
+                else:
+                    if instr[3] in self.variable_list:
+                        reg1 = self.getregforced(instr[3],instr)
+                        if reg1 == reg:
+                            reg1 = self.getregforced(instr[3],instr)
+                        print "    movl " + instr[3] + ", " + reg1
+                        print "    movl " + reg1 + ", (" + reg + ")"
+                    else:
+                        print "    movl $" + instr[3] + ", (" + reg + ")"
 
             elif instr[1] == '=*':           # a=*b, storing value of memory location where b is pointing to a
-                if self.pointers[instr[3]] in self.add_desc.keys():
-                    reg = self.add_desc[self.pointers[instr[3]]]
-                    self.spillreg(reg)
+                # if self.pointers[instr[3]] in self.add_desc.keys():
+                #     reg = self.add_desc[self.pointers[instr[3]]]
+                #     self.spillreg(reg)
+                #print "hereh"
                 if instr[3] in self.add_desc.keys():
-                    if instr[2] in self.add_desc.keys():
-                        print "    movl (" + self.add_desc[instr[3]] + "), " + self.add_desc[instr[2]]
-                    else:
-                        print "    movl (" + self.add_desc[instr[3]] + "), " + self.getreg(instr[2])
+                    reg = self.add_desc[instr[3]]
                 else:
-                    if instr[2] in self.add_desc.keys():
-                        print "    movl " + self.pointers[instr[3]] + ", " + self.add_desc[instr[2]]
+                    reg = self.getregforced(instr[3],instr)
+                    print "    movl " + instr[3] + ", " + reg
+                #print reg,instr
+                if instr[2] in self.add_desc.keys():
+                    print "    movl (" + reg + "), " + self.add_desc[instr[2]]
+                else:
+                    if instr[2] in self.variable_list:
+                        instr[2] = self.getregforced(instr[2],instr)
+                        print "    movl (" + reg + "), " + instr[2]
                     else:
-                        print "    movl " + self.pointers[instr[3]] + ", " + self.getreg(instr[2])            
+                        print "    movl (" + reg + "), $" + instr[2]
+
+                # if instr[3] in self.add_desc.keys():
+                #     if instr[2] in self.add_desc.keys():
+                #         print "    movl (" + self.add_desc[instr[3]] + "), " + self.add_desc[instr[2]]
+                #     else:
+                #         print "    movl (" + self.add_desc[instr[3]] + "), " + self.getreg(instr[2])
+                # else:
+                #     if instr[2] in self.add_desc.keys():
+                #         print "    movl " + self.pointers[instr[3]] + ", " + self.add_desc[instr[2]]
+                #     else:
+                #         print "    movl " + self.pointers[instr[3]] + ", " + self.getreg(instr[2])            
 
             elif instr[1] in self.bitops.keys():        # Handling bitwise operators(same as other arithmetic operators)
                 sys_op = self.bitops[instr[1]]
@@ -751,14 +806,26 @@ class AssCodeGen:
                     self.spillreg('%ecx')
                 if self.reg['%edx'] != 0:
                     self.spillreg('%edx')
-                if instr[2] in self.add_desc.keys():
-                    print "    pushl " + self.add_desc[instr[2]]
+                if self.variable_dict[instr[2]] not in ['int','array','string','pointer']:
+                    if instr[2] in self.add_desc.keys():
+                        reg = self.add_desc[instr[2]]
+                        self.spillreg(reg)
+                    print "    pushl $" + instr[2]
+                    print "    pushl $print_string"
+                    # else:
+                    #     if instr[2] in self.variable_list:
+                    #          print "    pushl " + instr[2]
+                    #     else:
+                    #         print "    pushl $" + instr[2]
                 else:
-                    if instr[2] in self.variable_list:
-                         print "    pushl " + instr[2]
+                    if instr[2] in self.add_desc.keys():
+                        print "    pushl " + self.add_desc[instr[2]]
                     else:
-                        print "    pushl $" + instr[2]
-                print "    pushl $output_string"
+                        if instr[2] in self.variable_list:
+                             print "    pushl " + instr[2]
+                        else:
+                            print "    pushl $" + instr[2]
+                    print "    pushl $output_string"
                 print "    call printf"
                 print "    addl $8, %esp"
 
@@ -773,7 +840,7 @@ class AssCodeGen:
                     reg = self.add_desc[instr[2]]
                     self.spillreg(reg)
                 print "    pushl $scan"
-                print "    call printf"                
+                print "    call printf"
                 print "    pushl $" + instr[2]
                 print "    pushl $input_string"
                 print "    call scanf"
@@ -791,6 +858,8 @@ class AssCodeGen:
                 print instr[2] + ":"
 
             elif instr[1] == 'ret':             # End of a functions
+                # print "    subl $4, %ebp"
+                # print "    movl %ebp, %esp"
                 if self.reg['%eax'] != 0:       # Spilling eax because return value will be stored in it
                     self.spillreg('%eax')
                 if (instr[0]+1) in self.leaders:
@@ -798,7 +867,10 @@ class AssCodeGen:
                         if self.reg[reg] != 0:
                             print "    movl " + reg + ", " + var
                             self.reg[reg] = 0
-                            del self.add_desc[var]            
+                            try:
+                                del self.add_desc[var]
+                            except KeyError:
+                            	pass
                 if len(instr) > 2:              # Means the function has a return value, store it in eax
                     if instr[2] in self.variable_list:
                         if instr[2] in self.add_desc.keys():
@@ -866,6 +938,22 @@ class AssCodeGen:
                         del self.add_desc[var]
                 print "    jmp L" + str(self.label[int(instr[2])])      # Jumping to the corresponding label
 
+            elif instr[1] == 'param':
+                self.params += 1
+                try:
+                    instr[2] = self.add_desc[instr[2]]
+                except KeyError:
+                    instr[2] = '$' + instr[2]
+            	print "    pushl " + instr[2]
+
+            elif instr[1] == 'new':
+                if self.reg['%eax'] != 0:
+                    self.spillreg('%eax')
+                print "    pushl $" + instr[2]
+                print "    call malloc"
+                print "    movl %eax," + instr[3]    #RETURN VALUE IN EAX NEEDS TO BE STORED IN var -> instr[3]
+                print "    addl $4, %esp "
+
         if block[0][1] != 'label':
             for reg,var in self.reg.iteritems():         # Putting all variables back into memory at the end of a basic block
                 if self.reg[reg] != 0:
@@ -877,7 +965,15 @@ class AssCodeGen:
                         pass
 
         if block[-1][1] == 'call':                  # Just after the function returns, eax has the return value so storing its value in the assigned variable
+            print "    movl %esp,%ebp"
+            print "    pushl %ebp"
             print "    call " + block[-1][2]
+            print "    popl %ebp"
+            if self.reg['%ebx'] != 0:
+                self.spillreg('%ebx')
+            for i in range(self.params):
+                print "    popl %ebx"
+            self.params = 0
             try:
                 print "    movl %eax, " + instr[3]
             except IndexError:
