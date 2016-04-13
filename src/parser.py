@@ -553,19 +553,33 @@ def p_M_classInit(p):
     ST.declareClass(p[-1])
 
 #--- Hash declaration list for declaring variables in class
-def p_hash_decl_struct(p):
-    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE   type_of_var COMMA hash_decl_struct
-                            | SUBROUTINE_ID KEY_VALUE   type_of_var
-                            
-                            | SUB SUBROUTINE_ID compound_stmt
-    '''
+def p_hash_decl_struct(p):  
+    '''hash_decl_struct     : SUBROUTINE_ID KEY_VALUE type_of_var COMMA hash_decl_struct
+                            | SUBROUTINE_ID KEY_VALUE type_of_var
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt COMMA hash_decl_struct
+                            | SUB SUBROUTINE_ID M_class_sub compound_stmt
+    '''                        
     if len(p) == 4:
         if p[1] != 'sub':
-            p[0] = { 'size' : p[3]['size'] }
-    elif len(p) == 6 :
-        p[0] = { 'size' : p[3]['size'] + p[5]['size'] }
+            p[0] = {
+            'size' : p[3]['size']
+            }
+    else :
+        p[0] = {
+        'size' : p[3]['size'] + p[5]['size']
+        }    
 
-    ST.insertIdentifier(p[1],idType=p[3]['type'],size=p[3]['size'])
+    if p[1] == 'sub' :
+        TAC[ST.currentScope].emit('ret','','','')
+        ST.endDeclareSub()
+
+def p_M_class_sub(p):
+    '''M_class_sub : '''
+    #TODO: Check if method is already declared in current scope    
+
+    ST.declareSub(p[-1])
+    TAC[ST.currentScope] = ThreeAddressCode.ThreeAddressCode()
+    TAC[ST.currentScope].emit('label',ST.getSubLabel(),'','')
 
 #--- Hash declaration list for calling new instance of class
 def p_struct_arg_hash(p):
@@ -664,6 +678,12 @@ def p_object_var_deref(p):
     else:
         print "Error! Type:",idType," is not the pointer of the correct object!"
         assert(False)
+
+def p_primary_exp_class_subroutine_call(p):
+    '''primary_exp          : SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
+                            | SUBROUTINE_ID DEREFERENCE SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
+                            
+    '''
 
 #==============================================================================
 # 'print' function implementation
@@ -1107,6 +1127,7 @@ def p_primary_exp_indexer(p):
 def p_primary_exp_subroutine_call(p):
     '''primary_exp          : SUBROUTINE_ID OPEN_PAREN array_decl_list  CLOSE_PAREN
                             | SUBROUTINE_ID OPEN_PAREN hash_decl        CLOSE_PAREN
+
     '''
     lhs_place = ST.createTemp()
     p[0] = {
@@ -1117,6 +1138,9 @@ def p_primary_exp_subroutine_call(p):
         for param in p[3]['place']:
             TAC[ST.currentScope].emit('param',param,'','')
     TAC[ST.currentScope].emit('call',ST.lookupSub(p[1]),p[0]['place'],'')
+
+
+
 
 def p_primary_exp_misc(p):
     '''primary_exp          : QW DIVIDE string_list DIVIDE

@@ -170,6 +170,9 @@ class SymbolTable:
         assert(idName in self.table[className]['identifiers'])
         return self.table[className]['identifiers'][idName]['offset']
 
+    def lookupClass(self,className):
+        return className in self.classes
+
     def lookupScope(self,idName):
         scope = self.currentScope
         while scope is not None:
